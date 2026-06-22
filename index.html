@@ -851,11 +851,19 @@ function generateQuestions() {
   });
   if (pairs.length === 0) return [];
   shuffle(pairs);
-  const leafTexts = nodes.filter(n => leafIds.has(n.id)).map(n => n.text);
+  const allLeafTexts = nodes.filter(n => leafIds.has(n.id)).map(n => n.text);
   return pairs.slice(0, 10).map(({ parent, child }) => {
-    const siblings = nodes.filter(n => n.parentId === parent.id).map(n => n.text);
-    const distractors = shuffle(leafTexts.filter(t => !siblings.includes(t))).slice(0, 3);
-    while (distractors.length < 3) distractors.push(`오답 ${distractors.length + 1}`);
+    // 오답 후보 1순위: 같은 부모의 다른 리프 형제 노드
+    const siblingLeafs = shuffle(
+      nodes.filter(n => n.parentId === parent.id && leafIds.has(n.id) && n.id !== child.id).map(n => n.text)
+    );
+    const distractors = siblingLeafs.slice(0, 3);
+    // 부족하면 맵 전체 리프에서 보충
+    if (distractors.length < 3) {
+      const used = new Set([child.text, ...distractors]);
+      const extras = shuffle(allLeafTexts.filter(t => !used.has(t)));
+      while (distractors.length < 3) distractors.push(extras.shift() ?? `오답 ${distractors.length + 1}`);
+    }
     return { parentText: parent.text, answer: child.text, options: shuffle([child.text, ...distractors]), ancestorPath: getAncestorPath(parent.id) };
   });
 }
