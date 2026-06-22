@@ -211,6 +211,11 @@
     .btn-secondary { background: #e2e8f0; color: #334155; } .btn-secondary:hover { background: #cbd5e1; }
     .btn-warning   { background: #fef3c7; color: #92400e; } .btn-warning:hover { background: #fde68a; }
     .btn-info      { background: #dbeafe; color: #1e40af; } .btn-info:hover { background: #bfdbfe; }
+    .btn-danger    { background: #fee2e2; color: #7f1d1d; } .btn-danger:hover  { background: #fecaca; }
+
+    .collapse-btn { cursor: pointer; }
+    .collapse-btn circle { transition: fill 0.15s; }
+    .collapse-btn:hover circle { fill: #4338ca; }
 
     /* ── 오답노트 floating panel ── */
     #wn-panel {
@@ -300,6 +305,7 @@
       <div class="result-sub" id="res-sub"></div>
       <div id="quiz-result-btns">
         <button class="btn-quiz-action btn-warning"   id="btn-show-wrongnote">오답노트</button>
+        <button class="btn-quiz-action btn-danger"    id="btn-retry-wrong">오답만 재시험</button>
         <button class="btn-quiz-action btn-info"      id="btn-show-history">기록 보기</button>
         <button class="btn-quiz-action btn-primary"   id="btn-retry">다시 풀기</button>
         <button class="btn-quiz-action btn-secondary" id="btn-close-quiz">닫기</button>
@@ -382,7 +388,7 @@ let editing     = null;
 
 // ── Storage ────────────────────────────────────────────
 function saveToStorage() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, nextId, panX, panY, scale })); } catch (_) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, nextId, panX, panY, scale, collapsed: [...collapsedIds] })); } catch (_) {}
 }
 function loadFromStorage() {
   try {
@@ -391,6 +397,7 @@ function loadFromStorage() {
     const d = JSON.parse(raw);
     nodes = d.nodes ?? []; nextId = d.nextId ?? 1;
     panX = d.panX ?? 0; panY = d.panY ?? 0; scale = d.scale ?? 1;
+    collapsedIds = new Set(d.collapsed ?? []);
     return nodes.length > 0;
   } catch (_) { return false; }
 }
@@ -409,6 +416,14 @@ function getDepth(id) {
   let depth = 0, node = nodes.find(n => n.id === id);
   while (node && node.parentId !== null) { depth++; node = nodes.find(n => n.id === node.parentId); }
   return depth;
+}
+function isVisible(nodeId) {
+  let cur = nodes.find(n => n.id === nodeId);
+  while (cur && cur.parentId !== null) {
+    if (collapsedIds.has(cur.parentId)) return false;
+    cur = nodes.find(n => n.id === cur.parentId);
+  }
+  return true;
 }
 function getRootChildIndex(id) {
   let node = nodes.find(n => n.id === id);
@@ -434,6 +449,7 @@ function deleteNode(id) {
   nodes.filter(n => n.parentId === id).forEach(c => deleteNode(c.id));
   nodes = nodes.filter(n => n.id !== id);
   selectedIds.delete(id);
+  collapsedIds.delete(id);
 }
 
 // ── Render ─────────────────────────────────────────────
@@ -444,6 +460,7 @@ function renderEdges() {
   edgesLayer.innerHTML = '';
   nodes.forEach(node => {
     if (node.parentId === null) return;
+    if (!isVisible(node.id)) return;
     const parent = nodes.find(n => n.id === node.parentId);
     if (!parent) return;
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -457,6 +474,7 @@ function renderEdges() {
 function renderNodes() {
   nodesLayer.innerHTML = '';
   nodes.forEach(node => {
+    if (!isVisible(node.id)) return;
     const color = getColor(node.id);
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('node');
@@ -482,6 +500,31 @@ function renderNodes() {
     g.addEventListener('mousedown', e => onNodeMousedown(e, node.id));
     g.addEventListener('click',    e => onNodeClick(e, node.id));
     g.addEventListener('dblclick', e => { e.stopPropagation(); startEdit(node.id); });
+
+    // 접기/펼치기 버튼 (자식이 있는 노드에만)
+    const hasChildren = nodes.some(c => c.parentId === node.id);
+    if (hasChildren) {
+      const isCollapsed = collapsedIds.has(node.id);
+      const btn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      btn.classList.add('collapse-btn');
+      const bx = node.x + NODE_W / 2, by = node.y;
+      const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circ.setAttribute('cx', bx); circ.setAttribute('cy', by); circ.setAttribute('r', 9);
+      circ.setAttribute('fill', '#4f46e5'); circ.setAttribute('stroke', 'white'); circ.setAttribute('stroke-width', '1.5');
+      const sym = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      sym.setAttribute('x', bx); sym.setAttribute('y', by);
+      sym.setAttribute('text-anchor', 'middle'); sym.setAttribute('dominant-baseline', 'middle');
+      sym.setAttribute('fill', 'white'); sym.setAttribute('font-size', '13'); sym.setAttribute('font-weight', '700');
+      sym.textContent = isCollapsed ? '+' : '−';
+      btn.appendChild(circ); btn.appendChild(sym); nodesLayer.appendChild(btn);
+      btn.addEventListener('mousedown', e => e.stopPropagation());
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        if (collapsedIds.has(node.id)) collapsedIds.delete(node.id);
+        else collapsedIds.add(node.id);
+        render();
+      });
+    }
   });
 }
 
@@ -757,6 +800,7 @@ const wnPanelCount  = document.getElementById('wn-panel-count');
 
 let quizQuestions = [], quizIdx = 0, quizCorrect = 0, quizAnswered = false, quizWrong = [];
 let quizScope = new Set();
+let collapsedIds = new Set();
 let quizTimerInterval = null;
 const QUIZ_TIME = 8;
 
@@ -971,10 +1015,11 @@ function selectAnswer(chosen) {
   quizAnswered = true;
   clearTimer();
   const isTimeout = chosen === null;
-  const correct = quizQuestions[quizIdx].answer, isRight = chosen === correct;
+  const q = quizQuestions[quizIdx];
+  const correct = q.answer, isRight = chosen === correct;
   if (isRight) quizCorrect++;
   else {
-    const w = { parentText: quizQuestions[quizIdx].parentText, chosen: isTimeout ? '(시간 초과)' : chosen, answer: correct };
+    const w = { parentText: q.parentText, chosen: isTimeout ? '(시간 초과)' : chosen, answer: correct, options: q.options, ancestorPath: q.ancestorPath };
     quizWrong.push(w);
     wnPanelCount.textContent = quizWrong.length;
     const item = document.createElement('div');
@@ -1005,8 +1050,21 @@ function showResult() {
   document.getElementById('res-msg').textContent = pct === 100 ? '완벽해요! 🏆' : pct >= 70 ? '잘 했어요! 👍' : pct >= 40 ? '조금 더 공부해요 📚' : '다시 도전해 보세요 💪';
   document.getElementById('res-sub').textContent = `${tot}문제 중 ${quizCorrect}문제 정답 (${pct}%)`;
   document.getElementById('btn-show-wrongnote').style.display = quizWrong.length > 0 ? '' : 'none';
+  document.getElementById('btn-retry-wrong').style.display    = quizWrong.length > 0 ? '' : 'none';
   saveQuizResult(quizCorrect, tot, pct);
   showQuizScreen('result');
+}
+
+function startRetryWrong() {
+  if (quizWrong.length === 0) return;
+  quizQuestions = quizWrong.map(w => ({
+    parentText: w.parentText, answer: w.answer,
+    options: shuffle([...w.options]), ancestorPath: w.ancestorPath
+  }));
+  quizIdx = 0; quizCorrect = 0; quizWrong = [];
+  wnPanelList.innerHTML = ''; wnPanelCount.textContent = '0'; wnPanel.classList.remove('visible');
+  showQuizScreen('question');
+  showQuestion();
 }
 
 function saveQuizResult(correct, total, pct) {
@@ -1047,6 +1105,7 @@ document.getElementById('btn-retry').addEventListener('click', startQuiz);
 document.getElementById('btn-retry-from-wn').addEventListener('click', startQuiz);
 document.getElementById('btn-retry-from-hist').addEventListener('click', startQuiz);
 document.getElementById('btn-show-wrongnote').addEventListener('click', showWrongNote);
+document.getElementById('btn-retry-wrong').addEventListener('click', startRetryWrong);
 document.getElementById('btn-show-history').addEventListener('click', showHistory);
 document.getElementById('btn-back-to-result').addEventListener('click',  () => showQuizScreen('result'));
 document.getElementById('btn-back-to-result2').addEventListener('click', () => showQuizScreen('result'));
