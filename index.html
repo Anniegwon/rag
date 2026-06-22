@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마인드맵</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; overflow: hidden; }
+
+    #toolbar {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+      background: white; border-radius: 12px; padding: 10px 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12); z-index: 100; user-select: none;
+    }
+    .tb-sep { width: 1px; background: #e2e8f0; margin: 0 2px; }
+
+    button {
+      padding: 7px 14px; border: none; border-radius: 8px; cursor: pointer;
+      font-size: 12px; font-weight: 500; transition: background 0.15s, opacity 0.15s;
+    }
+    button:disabled { opacity: 0.4; cursor: default; }
+    #btn-add    { background: #4f46e5; color: white; }
+    #btn-add:not(:disabled):hover { background: #4338ca; }
+    #btn-delete { background: #ef4444; color: white; }
+    #btn-delete:not(:disabled):hover { background: #dc2626; }
+    #btn-quiz   { background: #8b5cf6; color: white; }
+    #btn-quiz:hover { background: #7c3aed; }
+    #btn-svg    { background: #10b981; color: white; }
+    #btn-svg:hover { background: #059669; }
+    #btn-png    { background: #f59e0b; color: white; }
+    #btn-png:hover { background: #d97706; }
+    #btn-json-save { background: #06b6d4; color: white; }
+    #btn-json-save:hover { background: #0891b2; }
+    #btn-json-load { background: #64748b; color: white; }
+    #btn-json-load:hover { background: #475569; }
+
+    #zoom-indicator {
+      position: fixed; bottom: 16px; right: 16px;
+      background: rgba(0,0,0,0.5); color: white;
+      padding: 5px 12px; border-radius: 20px; font-size: 12px;
+      pointer-events: none;
+    }
+    #hint {
+      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.55); color: white;
+      padding: 8px 18px; border-radius: 20px; font-size: 12px;
+      pointer-events: none; white-space: nowrap;
+    }
+
+    svg { display: block; width: 100vw; height: 100vh; cursor: default; }
+    svg.panning { cursor: grabbing !important; }
+    svg.space-ready { cursor: grab; }
+
+    .edge { fill: none; stroke-width: 2.5; stroke-linecap: round; opacity: 0.55; }
+    .node { cursor: pointer; }
+    .node rect { transition: filter 0.1s; }
+    .node:hover rect { filter: brightness(0.93); }
+    .node.selected rect { stroke-width: 3.5 !important; filter: drop-shadow(0 0 6px rgba(0,0,0,0.22)); }
+    .node text { dominant-baseline: middle; text-anchor: middle; pointer-events: none; user-select: none; }
+
+    /* ── Quiz overlay ── */
+    #quiz-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(15,23,42,0.75); backdrop-filter: blur(4px);
+      z-index: 200; align-items: center; justify-content: center;
+    }
+    #quiz-overlay.active { display: flex; }
+
+    #quiz-card {
+      background: white; border-radius: 20px; padding: 32px 36px;
+      width: min(540px, 92vw); max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    #quiz-card::-webkit-scrollbar { width: 4px; }
+    #quiz-card::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+    #quiz-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #64748b; }
+    #quiz-progress-bar { height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+    #quiz-progress-fill { height: 100%; background: #4f46e5; border-radius: 99px; transition: width 0.3s; }
+
+    #quiz-question { text-align: center; }
+    #quiz-question .label { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    #quiz-question .parent-chip {
+      display: inline-block; background: #1e293b; color: #f8fafc;
+      padding: 8px 20px; border-radius: 10px; font-size: 16px; font-weight: 700; margin-bottom: 4px;
+    }
+    #quiz-ancestors { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
+    #quiz-question .question-text { font-size: 15px; color: #334155; font-weight: 500; }
+
+    #quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quiz-option {
+      padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 12px;
+      background: white; cursor: pointer; font-size: 14px; font-weight: 500;
+      color: #334155; text-align: center; transition: border-color 0.15s, background 0.15s, color 0.15s; line-height: 1.4;
+    }
+    .quiz-option:hover:not(:disabled) { border-color: #4f46e5; background: #eef2ff; color: #4f46e5; }
+    .quiz-option.correct { border-color: #10b981; background: #d1fae5; color: #065f46; }
+    .quiz-option.wrong   { border-color: #ef4444; background: #fee2e2; color: #7f1d1d; }
+    .quiz-option:disabled { cursor: default; }
+
+    #quiz-feedback { text-align: center; font-size: 15px; font-weight: 600; min-height: 22px; }
+    #quiz-feedback.correct { color: #10b981; }
+    #quiz-feedback.wrong   { color: #ef4444; }
+
+    #quiz-next {
+      align-self: center; padding: 12px 32px; background: #4f46e5; color: white;
+      border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: none;
+    }
+    #quiz-next:hover { background: #4338ca; }
+
+    /* ── 범위 선택 ── */
+    #quiz-scope { display: none; flex-direction: column; gap: 14px; }
+    #quiz-scope .scope-title { font-size: 17px; font-weight: 700; color: #1e293b; text-align: center; }
+    #quiz-scope .scope-sub   { font-size: 12px; color: #94a3b8; text-align: center; margin-top: -8px; }
+    #scope-list {
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: 360px; overflow-y: auto; padding-right: 2px;
+    }
+    #scope-list::-webkit-scrollbar { width: 4px; }
+    #scope-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    .scope-l1 { display: flex; flex-direction: column; gap: 4px; }
+    .scope-l1-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; border-radius: 10px; background: #f8fafc;
+      border: 1.5px solid #e2e8f0; cursor: pointer; user-select: none;
+    }
+    .scope-l1-row:hover { border-color: #a5b4fc; background: #eef2ff; }
+    .scope-l1-row.all-checked { border-color: #4f46e5; background: #eef2ff; }
+    .scope-l1-label { font-size: 14px; font-weight: 600; color: #1e293b; flex: 1; }
+    .scope-l1-count { font-size: 11px; color: #94a3b8; }
+    .scope-l2-list { display: flex; flex-direction: column; gap: 3px; padding-left: 24px; }
+    .scope-l2-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 12px; border-radius: 8px; border: 1.5px solid #f1f5f9;
+      cursor: pointer; user-select: none; background: white;
+    }
+    .scope-l2-row:hover { border-color: #c7d2fe; background: #f5f3ff; }
+    .scope-l2-row.checked { border-color: #818cf8; background: #f5f3ff; }
+    .scope-l2-label { font-size: 13px; color: #334155; flex: 1; }
+    .scope-cb {
+      width: 16px; height: 16px; border-radius: 4px; border: 2px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .scope-cb.checked { background: #4f46e5; border-color: #4f46e5; }
+    .scope-cb.checked::after { content: '✓'; color: white; font-size: 10px; line-height: 1; }
+    .scope-cb.partial { background: #a5b4fc; border-color: #4f46e5; }
+    .scope-cb.partial::after { content: '−'; color: white; font-size: 12px; line-height: 1; }
+    .scope-actions { display: flex; gap: 8px; }
+    .scope-actions button { flex: 1; padding: 8px; font-size: 12px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: white; cursor: pointer; color: #64748b; }
+    .scope-actions button:hover { border-color: #4f46e5; color: #4f46e5; }
+    .btn-scope-start { padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-scope-start:hover { background: #4338ca; }
+    .btn-scope-start:disabled { opacity: 0.4; cursor: default; }
+
+    #quiz-result { display: none; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+    #quiz-result .score-circle {
+      width: 100px; height: 100px; border-radius: 50%; background: #eef2ff; border: 4px solid #4f46e5;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #quiz-result .score-num { font-size: 28px; font-weight: 800; color: #4f46e5; }
+    #quiz-result .score-den { font-size: 13px; color: #64748b; }
+    #quiz-result .result-msg { font-size: 18px; font-weight: 700; color: #1e293b; }
+    #quiz-result .result-sub { font-size: 13px; color: #64748b; }
+    #quiz-result-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+    #quiz-wrongnote { display: none; flex-direction: column; gap: 12px; }
+    #quiz-wrongnote .wn-title { font-size: 17px; font-weight: 700; color: #1e293b; text-align: center; }
+    #quiz-wrongnote .wn-subtitle { font-size: 12px; color: #94a3b8; text-align: center; margin-top: -6px; }
+    #wn-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+    #wn-list::-webkit-scrollbar { width: 4px; }
+    #wn-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    .wn-item { border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .wn-item .wn-q { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748b; }
+    .wn-item .wn-chip { background: #1e293b; color: #f8fafc; padding: 3px 10px; border-radius: 6px; font-size: 13px; font-weight: 700; }
+    .wn-item .wn-answers { display: flex; gap: 8px; }
+    .wn-item .wn-wrong-ans  { flex: 1; background: #fee2e2; color: #7f1d1d; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 500; text-align: center; }
+    .wn-item .wn-correct-ans{ flex: 1; background: #d1fae5; color: #065f46; border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 500; text-align: center; }
+    .wn-item .wn-wrong-ans::before  { content: '✗  '; }
+    .wn-item .wn-correct-ans::before{ content: '✓  '; }
+    .wn-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+    #quiz-history { display: none; flex-direction: column; gap: 12px; }
+    #quiz-history .hist-title { font-size: 17px; font-weight: 700; color: #1e293b; text-align: center; }
+    #hist-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
+    #hist-list::-webkit-scrollbar { width: 4px; }
+    #hist-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+    .hist-empty { text-align: center; color: #94a3b8; font-size: 14px; padding: 24px 0; }
+    .hist-item { display: flex; align-items: center; justify-content: space-between; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; }
+    .hist-item .hist-date { font-size: 12px; color: #64748b; }
+    .hist-item .hist-score { font-size: 15px; font-weight: 700; color: #4f46e5; }
+    .hist-item .hist-pct { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; }
+    .hist-pct.hi  { background: #d1fae5; color: #065f46; }
+    .hist-pct.mid { background: #fef3c7; color: #78350f; }
+    .hist-pct.lo  { background: #fee2e2; color: #7f1d1d; }
+
+    .btn-quiz-action { padding: 10px 20px; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-primary   { background: #4f46e5; color: white; } .btn-primary:hover { background: #4338ca; }
+    .btn-secondary { background: #e2e8f0; color: #334155; } .btn-secondary:hover { background: #cbd5e1; }
+    .btn-warning   { background: #fef3c7; color: #92400e; } .btn-warning:hover { background: #fde68a; }
+    .btn-info      { background: #dbeafe; color: #1e40af; } .btn-info:hover { background: #bfdbfe; }
+
+    /* ── 오답노트 floating panel ── */
+    #wn-panel {
+      display: none; position: fixed; left: 16px; top: 50%; transform: translateY(-50%);
+      width: 210px; max-height: 70vh; background: white; border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18); z-index: 250;
+      flex-direction: column; overflow: hidden;
+    }
+    #wn-panel.visible { display: flex; }
+    #wn-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 14px; background: #fef3c7; border-bottom: 1px solid #fde68a; flex-shrink: 0;
+    }
+    #wn-panel-header .wn-panel-title { font-size: 13px; font-weight: 700; color: #92400e; }
+    #wn-panel-header .wn-panel-count { font-size: 11px; background: #f59e0b; color: white; border-radius: 99px; padding: 1px 7px; font-weight: 700; }
+    #wn-panel-close { background: none; border: none; cursor: pointer; color: #92400e; font-size: 14px; padding: 0 0 0 6px; line-height: 1; }
+    #wn-panel-list { overflow-y: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 7px; }
+    #wn-panel-list::-webkit-scrollbar { width: 3px; }
+    #wn-panel-list::-webkit-scrollbar-thumb { background: #fde68a; border-radius: 99px; }
+    .wn-panel-item { border: 1.5px solid #f3f4f6; border-radius: 9px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+    .wn-panel-item .wn-pi-q { font-size: 11px; color: #94a3b8; }
+    .wn-panel-item .wn-pi-chip { display: inline-block; background: #1e293b; color: #f8fafc; border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 700; margin-left: 3px; }
+    .wn-panel-item .wn-pi-wrong   { font-size: 12px; color: #b91c1c; background: #fee2e2; border-radius: 6px; padding: 4px 8px; }
+    .wn-panel-item .wn-pi-wrong::before   { content: '✗ '; }
+    .wn-panel-item .wn-pi-correct { font-size: 12px; color: #065f46; background: #d1fae5; border-radius: 6px; padding: 4px 8px; }
+    .wn-panel-item .wn-pi-correct::before { content: '✓ '; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button id="btn-add" disabled>+ 자식 노드</button>
+  <button id="btn-delete" disabled>삭제</button>
+  <div class="tb-sep"></div>
+  <button id="btn-quiz">퀴즈</button>
+  <div class="tb-sep"></div>
+  <button id="btn-svg">SVG</button>
+  <button id="btn-png">PNG</button>
+  <button id="btn-json-save">JSON 저장</button>
+  <button id="btn-json-load">JSON 열기</button>
+  <input type="file" id="file-input" accept=".json" style="display:none">
+</div>
+
+<div id="quiz-overlay">
+  <div id="quiz-card">
+    <div id="quiz-header">
+      <span id="quiz-count"></span>
+      <span id="quiz-score-live"></span>
+    </div>
+    <div id="quiz-progress-bar"><div id="quiz-progress-fill"></div></div>
+
+    <!-- 범위 선택 화면 -->
+    <div id="quiz-scope">
+      <div class="scope-title">퀴즈 범위 선택</div>
+      <div class="scope-sub">포함할 노드를 선택하세요</div>
+      <div class="scope-actions">
+        <button id="btn-scope-all">전체 선택</button>
+        <button id="btn-scope-none">전체 해제</button>
+      </div>
+      <div id="scope-list"></div>
+      <button class="btn-scope-start" id="btn-scope-start">퀴즈 시작</button>
+    </div>
+
+    <div id="quiz-question">
+      <div class="label">이 노드의 하위 항목은?</div>
+      <div class="parent-chip" id="quiz-parent"></div>
+      <div id="quiz-ancestors"></div>
+      <div class="question-text">다음 중 올바른 하위 항목을 고르세요.</div>
+    </div>
+    <div id="quiz-options"></div>
+    <div id="quiz-feedback"></div>
+    <button id="quiz-next">다음 →</button>
+
+    <div id="quiz-result">
+      <div class="score-circle">
+        <span class="score-num" id="res-num"></span>
+        <span class="score-den" id="res-den"></span>
+      </div>
+      <div class="result-msg" id="res-msg"></div>
+      <div class="result-sub" id="res-sub"></div>
+      <div id="quiz-result-btns">
+        <button class="btn-quiz-action btn-warning"   id="btn-show-wrongnote">오답노트</button>
+        <button class="btn-quiz-action btn-info"      id="btn-show-history">기록 보기</button>
+        <button class="btn-quiz-action btn-primary"   id="btn-retry">다시 풀기</button>
+        <button class="btn-quiz-action btn-secondary" id="btn-close-quiz">닫기</button>
+      </div>
+    </div>
+
+    <div id="quiz-wrongnote">
+      <div class="wn-title">오답노트</div>
+      <div class="wn-subtitle" id="wn-subtitle"></div>
+      <div id="wn-list"></div>
+      <div class="wn-btns">
+        <button class="btn-quiz-action btn-primary"   id="btn-retry-from-wn">다시 풀기</button>
+        <button class="btn-quiz-action btn-secondary" id="btn-back-to-result">← 결과로</button>
+      </div>
+    </div>
+
+    <div id="quiz-history">
+      <div class="hist-title">퀴즈 기록</div>
+      <div id="hist-list"></div>
+      <div class="wn-btns">
+        <button class="btn-quiz-action btn-primary"   id="btn-retry-from-hist">다시 풀기</button>
+        <button class="btn-quiz-action btn-secondary" id="btn-back-to-result2">← 결과로</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 오답노트 floating panel -->
+<div id="wn-panel">
+  <div id="wn-panel-header">
+    <span class="wn-panel-title">오답노트</span>
+    <span class="wn-panel-count" id="wn-panel-count">0</span>
+    <button id="wn-panel-close">✕</button>
+  </div>
+  <div id="wn-panel-list"></div>
+</div>
+
+<svg id="svg" xmlns="http://www.w3.org/2000/svg">
+  <g id="canvas">
+    <g id="edges-layer"></g>
+    <g id="nodes-layer"></g>
+  </g>
+</svg>
+
+<div id="hint">드래그: 다중 선택 &nbsp;|&nbsp; Space+드래그: 이동 &nbsp;|&nbsp; Shift+클릭: 추가 선택 &nbsp;|&nbsp; 휠: 줌 &nbsp;|&nbsp; 더블클릭: 편집</div>
+<div id="zoom-indicator">100%</div>
+
+<script>
+const svg        = document.getElementById('svg');
+const canvas     = document.getElementById('canvas');
+const edgesLayer = document.getElementById('edges-layer');
+const nodesLayer = document.getElementById('nodes-layer');
+const btnAdd     = document.getElementById('btn-add');
+const btnDelete  = document.getElementById('btn-delete');
+
+// ── Constants ──────────────────────────────────────────
+const NODE_W = 130, NODE_H = 44, CHILD_DIST = 190;
+const STORAGE_KEY = 'mindmap-data', HISTORY_KEY = 'mindmap-quiz-history';
+const ROOT_COLOR = { fill: '#1e293b', stroke: '#0f172a', text: '#f8fafc' };
+const COLORS = [
+  { fill: '#dbeafe', stroke: '#3b82f6', text: '#1e40af' },
+  { fill: '#d1fae5', stroke: '#10b981', text: '#065f46' },
+  { fill: '#fce7f3', stroke: '#ec4899', text: '#9d174d' },
+  { fill: '#fef3c7', stroke: '#f59e0b', text: '#78350f' },
+  { fill: '#ede9fe', stroke: '#8b5cf6', text: '#4c1d95' },
+  { fill: '#fee2e2', stroke: '#ef4444', text: '#7f1d1d' },
+];
+
+// ── State ──────────────────────────────────────────────
+let nodes       = [];
+let nextId      = 1;
+let selectedIds = new Set();   // multi-selection
+let dragging    = null;        // { items:[{id,origX,origY}], startPt }
+let selBox      = null;        // { startPt, el } — rubber-band selection
+let panning     = null;        // { startX, startY, origPanX, origPanY }
+let panMoved    = false;
+let spaceDown   = false;
+let panX = 0, panY = 0, scale = 1;
+let editing     = null;
+
+// ── Storage ────────────────────────────────────────────
+function saveToStorage() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, nextId, panX, panY, scale })); } catch (_) {}
+}
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    nodes = d.nodes ?? []; nextId = d.nextId ?? 1;
+    panX = d.panX ?? 0; panY = d.panY ?? 0; scale = d.scale ?? 1;
+    return nodes.length > 0;
+  } catch (_) { return false; }
+}
+
+// ── Helpers ────────────────────────────────────────────
+function getCanvasPoint(e) {
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(canvas.getScreenCTM().inverse());
+}
+function applyTransform() {
+  canvas.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`);
+  document.getElementById('zoom-indicator').textContent = `${Math.round(scale * 100)}%`;
+}
+function getDepth(id) {
+  let depth = 0, node = nodes.find(n => n.id === id);
+  while (node && node.parentId !== null) { depth++; node = nodes.find(n => n.id === node.parentId); }
+  return depth;
+}
+function getRootChildIndex(id) {
+  let node = nodes.find(n => n.id === id);
+  while (node && node.parentId !== null) {
+    const p = nodes.find(n => n.id === node.parentId);
+    if (!p || p.parentId === null) break;
+    node = p;
+  }
+  return nodes.filter(n => n.parentId === (node?.parentId ?? null)).indexOf(node);
+}
+function getColor(id) {
+  if (getDepth(id) === 0) return ROOT_COLOR;
+  const idx = getRootChildIndex(id);
+  return COLORS[(idx >= 0 ? idx : 0) % COLORS.length];
+}
+
+// ── Node operations ────────────────────────────────────
+function addNode(parentId, x, y, text = '새 주제') {
+  const node = { id: nextId++, parentId, x, y, text };
+  nodes.push(node); return node;
+}
+function deleteNode(id) {
+  nodes.filter(n => n.parentId === id).forEach(c => deleteNode(c.id));
+  nodes = nodes.filter(n => n.id !== id);
+  selectedIds.delete(id);
+}
+
+// ── Render ─────────────────────────────────────────────
+function render() {
+  renderEdges(); renderNodes(); updateToolbar(); saveToStorage();
+}
+function renderEdges() {
+  edgesLayer.innerHTML = '';
+  nodes.forEach(node => {
+    if (node.parentId === null) return;
+    const parent = nodes.find(n => n.id === node.parentId);
+    if (!parent) return;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const cx = (parent.x + node.x) / 2;
+    path.setAttribute('d', `M${parent.x},${parent.y} C${cx},${parent.y} ${cx},${node.y} ${node.x},${node.y}`);
+    path.setAttribute('stroke', getColor(node.id).stroke);
+    path.classList.add('edge');
+    edgesLayer.appendChild(path);
+  });
+}
+function renderNodes() {
+  nodesLayer.innerHTML = '';
+  nodes.forEach(node => {
+    const color = getColor(node.id);
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.classList.add('node');
+    if (selectedIds.has(node.id)) g.classList.add('selected');
+    g.dataset.id = node.id;
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', node.x - NODE_W / 2); rect.setAttribute('y', node.y - NODE_H / 2);
+    rect.setAttribute('width', NODE_W); rect.setAttribute('height', NODE_H);
+    rect.setAttribute('rx', 10); rect.setAttribute('fill', color.fill);
+    rect.setAttribute('stroke', color.stroke); rect.setAttribute('stroke-width', '2');
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', node.x); text.setAttribute('y', node.y);
+    text.setAttribute('fill', color.text); text.setAttribute('font-size', '14');
+    text.setAttribute('font-family', 'Segoe UI, sans-serif');
+    text.setAttribute('font-weight', getDepth(node.id) === 0 ? '700' : '500');
+    text.setAttribute('dominant-baseline', 'middle'); text.setAttribute('text-anchor', 'middle');
+    text.textContent = node.text.length > 14 ? node.text.slice(0, 13) + '…' : node.text;
+
+    g.appendChild(rect); g.appendChild(text); nodesLayer.appendChild(g);
+
+    g.addEventListener('mousedown', e => onNodeMousedown(e, node.id));
+    g.addEventListener('click',    e => onNodeClick(e, node.id));
+    g.addEventListener('dblclick', e => { e.stopPropagation(); startEdit(node.id); });
+  });
+}
+
+// ── Selection ──────────────────────────────────────────
+function updateToolbar() {
+  const sel = [...selectedIds].map(id => nodes.find(n => n.id === id)).filter(Boolean);
+  btnAdd.disabled    = sel.length !== 1;
+  btnDelete.disabled = sel.length === 0 || sel.every(n => n.parentId === null);
+}
+
+// ── Node click ─────────────────────────────────────────
+function onNodeClick(e, id) {
+  e.stopPropagation();
+  if (e.shiftKey) {
+    // toggle in selection
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+  } else {
+    selectedIds = new Set([id]);
+  }
+  render();
+}
+
+// ── Node drag ──────────────────────────────────────────
+function onNodeMousedown(e, id) {
+  if (e.detail > 1) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!selectedIds.has(id)) {
+    selectedIds = new Set([id]);
+    render();
+  }
+  const pt = getCanvasPoint(e);
+  dragging = {
+    items: [...selectedIds].map(nid => {
+      const n = nodes.find(x => x.id === nid);
+      return { id: nid, origX: n.x, origY: n.y };
+    }),
+    startPt: pt,
+  };
+}
+
+function moveNodeInPlace(id, x, y) {
+  const g = nodesLayer.querySelector(`[data-id="${id}"]`);
+  if (!g) return;
+  g.querySelector('rect').setAttribute('x', x - NODE_W / 2);
+  g.querySelector('rect').setAttribute('y', y - NODE_H / 2);
+  g.querySelector('text').setAttribute('x', x);
+  g.querySelector('text').setAttribute('y', y);
+  const fo = document.getElementById('edit-fo');
+  if (fo && editing === id) {
+    fo.setAttribute('x', x - NODE_W / 2 + 6); fo.setAttribute('y', y - NODE_H / 2 + 5);
+  }
+}
+
+// ── Background mousedown: selbox or pan ────────────────
+svg.addEventListener('mousedown', e => {
+  if (e.target !== svg && e.target !== canvas) return;
+  if (spaceDown || e.button === 1) {
+    // pan
+    panning = { startX: e.clientX, startY: e.clientY, origPanX: panX, origPanY: panY };
+    panMoved = false;
+    svg.classList.add('panning');
+  } else {
+    // rubber-band selection
+    const pt = getCanvasPoint(e);
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    el.setAttribute('fill', 'rgba(79,70,229,0.08)');
+    el.setAttribute('stroke', '#4f46e5');
+    el.setAttribute('stroke-width', '1.5');
+    el.setAttribute('stroke-dasharray', '5 3');
+    el.setAttribute('vector-effect', 'non-scaling-stroke');
+    el.setAttribute('rx', '4');
+    canvas.appendChild(el);
+    selBox = { startPt: pt, el };
+    panMoved = false;
+  }
+});
+
+// ── Zoom ───────────────────────────────────────────────
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+  const newScale = Math.min(4, Math.max(0.2, scale * factor));
+  const ratio = newScale / scale;
+  panX = e.clientX - ratio * (e.clientX - panX);
+  panY = e.clientY - ratio * (e.clientY - panY);
+  scale = newScale;
+  applyTransform(); saveToStorage();
+}, { passive: false });
+
+// ── Space key for pan mode ─────────────────────────────
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !editing && e.target === document.body) {
+    e.preventDefault(); spaceDown = true; svg.classList.add('space-ready');
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space') { spaceDown = false; svg.classList.remove('space-ready'); }
+});
+
+// ── Shared mousemove ───────────────────────────────────
+window.addEventListener('mousemove', e => {
+  if (dragging) {
+    const pt = getCanvasPoint(e);
+    const dx = pt.x - dragging.startPt.x, dy = pt.y - dragging.startPt.y;
+    dragging.items.forEach(({ id, origX, origY }) => {
+      const node = nodes.find(n => n.id === id);
+      if (!node) return;
+      node.x = origX + dx; node.y = origY + dy;
+      moveNodeInPlace(id, node.x, node.y);
+    });
+    renderEdges();
+    return;
+  }
+  if (panning) {
+    const dx = e.clientX - panning.startX, dy = e.clientY - panning.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) panMoved = true;
+    panX = panning.origPanX + dx; panY = panning.origPanY + dy;
+    applyTransform(); return;
+  }
+  if (selBox) {
+    const pt = getCanvasPoint(e);
+    const x = Math.min(pt.x, selBox.startPt.x), y = Math.min(pt.y, selBox.startPt.y);
+    const w = Math.abs(pt.x - selBox.startPt.x), h = Math.abs(pt.y - selBox.startPt.y);
+    selBox.el.setAttribute('x', x); selBox.el.setAttribute('y', y);
+    selBox.el.setAttribute('width', w); selBox.el.setAttribute('height', h);
+    if (w > 4 || h > 4) panMoved = true;
+  }
+});
+
+window.addEventListener('mouseup', e => {
+  if (dragging) { render(); dragging = null; return; }
+  if (panning)  { if (panMoved) saveToStorage(); panning = null; svg.classList.remove('panning'); return; }
+  if (selBox) {
+    const pt = getCanvasPoint(e);
+    const x1 = Math.min(pt.x, selBox.startPt.x), x2 = Math.max(pt.x, selBox.startPt.x);
+    const y1 = Math.min(pt.y, selBox.startPt.y), y2 = Math.max(pt.y, selBox.startPt.y);
+    selBox.el.remove(); selBox = null;
+    if (x2 - x1 > 4 || y2 - y1 > 4) {
+      const hit = nodes.filter(n => n.x >= x1 && n.x <= x2 && n.y >= y1 && n.y <= y2);
+      if (e.shiftKey) hit.forEach(n => selectedIds.add(n.id));
+      else selectedIds = new Set(hit.map(n => n.id));
+    }
+    render();
+  }
+});
+
+svg.addEventListener('click', () => {
+  if (panMoved) { panMoved = false; return; }
+  selectedIds = new Set(); render();
+});
+
+// ── Inline editing ─────────────────────────────────────
+function startEdit(id) {
+  if (editing !== null) commitEdit();
+  editing = id;
+  const node = nodes.find(n => n.id === id), color = getColor(id);
+  const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+  fo.setAttribute('x', node.x - NODE_W / 2 + 6); fo.setAttribute('y', node.y - NODE_H / 2 + 5);
+  fo.setAttribute('width', NODE_W - 12); fo.setAttribute('height', NODE_H - 10); fo.id = 'edit-fo';
+  const input = document.createElement('input');
+  input.value = node.text;
+  Object.assign(input.style, {
+    width: '100%', height: '100%', border: 'none', outline: 'none',
+    background: 'transparent', textAlign: 'center', fontSize: '14px',
+    fontFamily: 'Segoe UI, sans-serif', fontWeight: getDepth(id) === 0 ? '700' : '500', color: color.text,
+  });
+  fo.appendChild(input); nodesLayer.appendChild(fo); input.focus(); input.select();
+  input.addEventListener('blur', () => commitEdit());
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+    if (e.key === 'Escape') { editing = null; fo.remove(); }
+    e.stopPropagation();
+  });
+}
+function commitEdit() {
+  if (editing === null) return;
+  const fo = document.getElementById('edit-fo'), node = nodes.find(n => n.id === editing);
+  if (fo && node) { const v = fo.querySelector('input')?.value.trim(); if (v) node.text = v; fo.remove(); }
+  editing = null; render();
+}
+
+// ── Add / Delete ───────────────────────────────────────
+btnAdd.addEventListener('click', () => {
+  if (selectedIds.size !== 1) return;
+  const [sid] = selectedIds;
+  const parent = nodes.find(n => n.id === sid); if (!parent) return;
+  const children = nodes.filter(n => n.parentId === sid);
+  const angle = children.length === 0 ? (Math.PI * 2 * Math.random()) : (children.length * 0.65 + Math.PI / 6);
+  const newNode = addNode(sid, parent.x + Math.cos(angle) * CHILD_DIST, parent.y + Math.sin(angle) * CHILD_DIST);
+  render(); selectedIds = new Set([newNode.id]); render();
+  setTimeout(() => startEdit(newNode.id), 30);
+});
+
+btnDelete.addEventListener('click', deleteSelected);
+function deleteSelected() {
+  const toDelete = [...selectedIds].filter(id => {
+    const n = nodes.find(x => x.id === id); return n && n.parentId !== null;
+  });
+  if (toDelete.length === 0) return;
+  toDelete.forEach(id => deleteNode(id));
+  render();
+}
+
+document.addEventListener('keydown', e => {
+  if (editing !== null) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+});
+
+// ── Export ─────────────────────────────────────────────
+function buildExportSVG() {
+  if (editing !== null) commitEdit();
+  const clone = svg.cloneNode(true);
+  clone.querySelectorAll('#edit-fo').forEach(el => el.remove());
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.style.background = '#f0f4f8'; return clone;
+}
+document.getElementById('btn-svg').addEventListener('click', () => {
+  const s = new XMLSerializer().serializeToString(buildExportSVG());
+  Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([s], { type: 'image/svg+xml' })), download: 'mindmap.svg',
+  }).click();
+});
+document.getElementById('btn-png').addEventListener('click', () => {
+  const w = svg.clientWidth, h = svg.clientHeight;
+  const clone = buildExportSVG(); clone.setAttribute('width', w); clone.setAttribute('height', h);
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }));
+  const img = new Image();
+  img.onload = () => {
+    const cnv = document.createElement('canvas'); cnv.width = w * 2; cnv.height = h * 2;
+    const ctx = cnv.getContext('2d'); ctx.scale(2, 2); ctx.fillStyle = '#f0f4f8'; ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h); URL.revokeObjectURL(url);
+    Object.assign(document.createElement('a'), { href: cnv.toDataURL('image/png'), download: 'mindmap.png' }).click();
+  }; img.src = url;
+});
+document.getElementById('btn-json-save').addEventListener('click', () => {
+  Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([JSON.stringify({ nodes, nextId, panX, panY, scale }, null, 2)], { type: 'application/json' })),
+    download: 'mindmap.json',
+  }).click();
+});
+document.getElementById('btn-json-load').addEventListener('click', () => document.getElementById('file-input').click());
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      nodes = d.nodes ?? []; nextId = d.nextId ?? 1;
+      panX = d.panX ?? 0; panY = d.panY ?? 0; scale = d.scale ?? 1;
+      selectedIds = new Set(); applyTransform(); render();
+    } catch (_) { alert('올바른 마인드맵 JSON 파일이 아닙니다.'); }
+  };
+  reader.readAsText(file); e.target.value = '';
+});
+
+// ── Quiz ───────────────────────────────────────────────
+const quizOverlay   = document.getElementById('quiz-overlay');
+const quizCount     = document.getElementById('quiz-count');
+const quizScoreLive = document.getElementById('quiz-score-live');
+const quizFill      = document.getElementById('quiz-progress-fill');
+const quizParent    = document.getElementById('quiz-parent');
+const quizOptions   = document.getElementById('quiz-options');
+const quizFeedback  = document.getElementById('quiz-feedback');
+const quizNext      = document.getElementById('quiz-next');
+const quizQuestion  = document.getElementById('quiz-question');
+const quizResult    = document.getElementById('quiz-result');
+const quizWrongnote = document.getElementById('quiz-wrongnote');
+const quizHistoryEl = document.getElementById('quiz-history');
+const wnPanel       = document.getElementById('wn-panel');
+const wnPanelList   = document.getElementById('wn-panel-list');
+const wnPanelCount  = document.getElementById('wn-panel-count');
+
+let quizQuestions = [], quizIdx = 0, quizCorrect = 0, quizAnswered = false, quizWrong = [];
+let quizScope = new Set(); // IDs of parent nodes selected for quiz
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+function getAncestorPath(nodeId) {
+  const path = []; let node = nodes.find(n => n.id === nodeId);
+  while (node) { path.unshift(node.text); if (node.parentId === null) break; node = nodes.find(n => n.id === node.parentId); }
+  return path;
+}
+function generateQuestions() {
+  const leafIds = new Set(nodes.filter(n => !nodes.some(c => c.parentId === n.id)).map(n => n.id));
+  const pairs = [];
+  function isInScope(nodeId) {
+    if (quizScope.size === 0) return true;
+    let cur = nodes.find(n => n.id === nodeId);
+    while (cur) {
+      if (quizScope.has(cur.id)) return true;
+      if (cur.parentId === null) return false;
+      cur = nodes.find(n => n.id === cur.parentId);
+    }
+    return false;
+  }
+  nodes.forEach(parent => {
+    if (!isInScope(parent.id)) return;
+    nodes.filter(n => n.parentId === parent.id && leafIds.has(n.id)).forEach(child => pairs.push({ parent, child }));
+  });
+  if (pairs.length === 0) return [];
+  shuffle(pairs);
+  const leafTexts = nodes.filter(n => leafIds.has(n.id)).map(n => n.text);
+  return pairs.slice(0, 10).map(({ parent, child }) => {
+    const siblings = nodes.filter(n => n.parentId === parent.id).map(n => n.text);
+    const distractors = shuffle(leafTexts.filter(t => !siblings.includes(t))).slice(0, 3);
+    while (distractors.length < 3) distractors.push(`오답 ${distractors.length + 1}`);
+    return { parentText: parent.text, answer: child.text, options: shuffle([child.text, ...distractors]), ancestorPath: getAncestorPath(parent.id) };
+  });
+}
+
+function showQuizScreen(name) {
+  document.getElementById('quiz-scope').style.display = name === 'scope'     ? 'flex' : 'none';
+  quizQuestion.style.display  = name === 'question'  ? '' : 'none';
+  quizOptions.style.display   = name === 'question'  ? '' : 'none';
+  quizFeedback.textContent    = ''; quizNext.style.display = 'none';
+  quizResult.style.display    = name === 'result'    ? 'flex' : 'none';
+  quizWrongnote.style.display = name === 'wrongnote' ? 'flex' : 'none';
+  quizHistoryEl.style.display = name === 'history'   ? 'flex' : 'none';
+}
+
+function openScopeScreen() {
+  const leafIds = new Set(nodes.filter(n => !nodes.some(c => c.parentId === n.id)).map(n => n.id));
+
+  function hasQuestions(nodeId) {
+    if (nodes.some(c => c.parentId === nodeId && leafIds.has(c.id))) return true;
+    return nodes.filter(c => c.parentId === nodeId).some(c => hasQuestions(c.id));
+  }
+  function countQuestions(nodeId) {
+    let count = 0;
+    nodes.filter(c => c.parentId === nodeId).forEach(child => {
+      count += leafIds.has(child.id) ? 1 : countQuestions(child.id);
+    });
+    return count;
+  }
+
+  const root = nodes.find(n => n.parentId === null);
+  const l1Nodes = root ? nodes.filter(n => n.parentId === root.id) : [];
+  const l1WithQ = l1Nodes.filter(l1 => hasQuestions(l1.id));
+
+  if (l1WithQ.length === 0) { alert('퀴즈를 만들려면 부모-자식 관계의 노드가 최소 1쌍 필요합니다.'); return; }
+
+  // quizScope는 선택된 L1 노드 ID를 저장
+  quizScope = new Set(l1WithQ.map(l1 => l1.id));
+
+  const scopeList = document.getElementById('scope-list');
+  scopeList.innerHTML = '';
+
+  l1WithQ.forEach(l1 => {
+    const row = document.createElement('div');
+    row.className = 'scope-l1-row all-checked';
+    row.dataset.id = l1.id;
+
+    const cb = document.createElement('div');
+    cb.className = 'scope-cb checked';
+
+    const label = document.createElement('span');
+    label.className = 'scope-l1-label';
+    label.textContent = l1.text;
+
+    const countSpan = document.createElement('span');
+    countSpan.className = 'scope-l1-count';
+    countSpan.textContent = `${countQuestions(l1.id)}문제`;
+
+    row.appendChild(cb);
+    row.appendChild(label);
+    row.appendChild(countSpan);
+    row.addEventListener('click', () => toggleScope(l1.id, cb, row));
+
+    scopeList.appendChild(row);
+  });
+
+  updateScopeStartBtn();
+  showQuizScreen('scope');
+  quizOverlay.classList.add('active');
+}
+
+function updateGroupHeader(headerRow, cb, childIds) {
+  const allOn  = childIds.every(id => quizScope.has(id));
+  const anyOn  = childIds.some(id => quizScope.has(id));
+  cb.className = allOn ? 'scope-cb checked' : anyOn ? 'scope-cb partial' : 'scope-cb';
+  headerRow.classList.toggle('all-checked', allOn);
+  updateScopeStartBtn();
+}
+
+function toggleScope(id, cb, row) {
+  if (quizScope.has(id)) {
+    quizScope.delete(id);
+    cb.className = 'scope-cb';
+    row.classList.remove('checked', 'all-checked');
+  } else {
+    quizScope.add(id);
+    cb.className = 'scope-cb checked';
+    row.classList.add(row.classList.contains('scope-l1-row') ? 'all-checked' : 'checked');
+  }
+  updateScopeStartBtn();
+}
+
+function updateScopeStartBtn() {
+  document.getElementById('btn-scope-start').disabled = quizScope.size === 0;
+}
+
+document.getElementById('btn-scope-all').addEventListener('click', () => {
+  document.querySelectorAll('#scope-list [data-id]').forEach(row => {
+    quizScope.add(Number(row.dataset.id));
+    const cb = row.querySelector('.scope-cb'); cb.className = 'scope-cb checked';
+    row.classList.add(row.classList.contains('scope-l1-row') ? 'all-checked' : 'checked');
+  });
+  document.querySelectorAll('#scope-list .scope-l1-row:not([data-id])').forEach(row => {
+    row.querySelector('.scope-cb').className = 'scope-cb checked';
+    row.classList.add('all-checked');
+  });
+  updateScopeStartBtn();
+});
+
+document.getElementById('btn-scope-none').addEventListener('click', () => {
+  document.querySelectorAll('#scope-list [data-id]').forEach(row => {
+    quizScope.delete(Number(row.dataset.id));
+    const cb = row.querySelector('.scope-cb'); cb.className = 'scope-cb';
+    row.classList.remove('checked', 'all-checked');
+  });
+  document.querySelectorAll('#scope-list .scope-l1-row:not([data-id])').forEach(row => {
+    row.querySelector('.scope-cb').className = 'scope-cb';
+    row.classList.remove('all-checked');
+  });
+  updateScopeStartBtn();
+});
+
+document.getElementById('btn-scope-start').addEventListener('click', () => {
+  quizQuestions = generateQuestions();
+  if (quizQuestions.length === 0) { alert('선택된 범위에서 출제할 문제가 없습니다.'); return; }
+  quizIdx = 0; quizCorrect = 0; quizWrong = [];
+  wnPanelList.innerHTML = ''; wnPanelCount.textContent = '0'; wnPanel.classList.remove('visible');
+  showQuizScreen('question');
+  showQuestion();
+});
+
+function startQuiz() {
+  openScopeScreen();
+}
+
+function showQuestion() {
+  quizAnswered = false;
+  const q = quizQuestions[quizIdx], tot = quizQuestions.length;
+  quizCount.textContent     = `${quizIdx + 1} / ${tot}`;
+  quizScoreLive.textContent = `정답 ${quizCorrect}`;
+  quizFill.style.width      = `${(quizIdx / tot) * 100}%`;
+  quizParent.textContent    = q.parentText;
+  document.getElementById('quiz-ancestors').textContent =
+    q.ancestorPath.length > 1 ? q.ancestorPath.slice(0, -1).join(' > ') + ' >' : '';
+  quizFeedback.textContent = ''; quizFeedback.className = ''; quizNext.style.display = 'none';
+  quizOptions.innerHTML = '';
+  q.options.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-option'; btn.textContent = opt;
+    btn.addEventListener('click', () => selectAnswer(opt));
+    quizOptions.appendChild(btn);
+  });
+}
+
+function selectAnswer(chosen) {
+  if (quizAnswered) return;
+  quizAnswered = true;
+  const correct = quizQuestions[quizIdx].answer, isRight = chosen === correct;
+  if (isRight) quizCorrect++;
+  else {
+    const w = { parentText: quizQuestions[quizIdx].parentText, chosen, answer: correct };
+    quizWrong.push(w);
+    wnPanelCount.textContent = quizWrong.length;
+    const item = document.createElement('div');
+    item.className = 'wn-panel-item';
+    item.innerHTML = `<div class="wn-pi-q">질문 <span class="wn-pi-chip">${w.parentText}</span></div><div class="wn-pi-wrong">${w.chosen}</div><div class="wn-pi-correct">${w.answer}</div>`;
+    wnPanelList.appendChild(item);
+    wnPanel.classList.add('visible');
+  }
+  quizOptions.querySelectorAll('.quiz-option').forEach(btn => {
+    btn.disabled = true;
+    if (btn.textContent === correct) btn.classList.add('correct');
+    else if (btn.textContent === chosen && !isRight) btn.classList.add('wrong');
+  });
+  quizFeedback.textContent = isRight ? '정답입니다! 🎉' : `오답 — 정답: ${correct}`;
+  quizFeedback.className   = isRight ? 'correct' : 'wrong';
+  quizNext.style.display   = 'block';
+  quizNext.textContent     = quizIdx + 1 < quizQuestions.length ? '다음 →' : '결과 보기';
+}
+
+quizNext.addEventListener('click', () => { quizIdx++; if (quizIdx < quizQuestions.length) showQuestion(); else showResult(); });
+
+function showResult() {
+  const tot = quizQuestions.length, pct = Math.round((quizCorrect / tot) * 100);
+  quizFill.style.width = '100%'; quizCount.textContent = `${tot} / ${tot}`; quizScoreLive.textContent = `정답 ${quizCorrect}`;
+  document.getElementById('res-num').textContent = quizCorrect;
+  document.getElementById('res-den').textContent = `/ ${tot}`;
+  document.getElementById('res-msg').textContent = pct === 100 ? '완벽해요! 🏆' : pct >= 70 ? '잘 했어요! 👍' : pct >= 40 ? '조금 더 공부해요 📚' : '다시 도전해 보세요 💪';
+  document.getElementById('res-sub').textContent = `${tot}문제 중 ${quizCorrect}문제 정답 (${pct}%)`;
+  document.getElementById('btn-show-wrongnote').style.display = quizWrong.length > 0 ? '' : 'none';
+  saveQuizResult(quizCorrect, tot, pct);
+  showQuizScreen('result');
+}
+
+function saveQuizResult(correct, total, pct) {
+  try {
+    const h = getQuizHistory();
+    h.unshift({ date: new Date().toLocaleString('ko-KR'), correct, total, pct });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 50)));
+  } catch (_) {}
+}
+function getQuizHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? []; } catch (_) { return []; } }
+
+function showHistory() {
+  const history = getQuizHistory();
+  const list = document.getElementById('hist-list'); list.innerHTML = '';
+  if (history.length === 0) { list.innerHTML = '<div class="hist-empty">아직 기록이 없습니다.</div>'; }
+  else history.forEach(({ date, correct, total, pct }) => {
+    const cls = pct >= 70 ? 'hi' : pct >= 40 ? 'mid' : 'lo';
+    const item = document.createElement('div'); item.className = 'hist-item';
+    item.innerHTML = `<span class="hist-date">${date}</span><span class="hist-score">${correct} / ${total}</span><span class="hist-pct ${cls}">${pct}%</span>`;
+    list.appendChild(item);
+  });
+  showQuizScreen('history');
+}
+
+function showWrongNote() {
+  document.getElementById('wn-subtitle').textContent = `틀린 문제 ${quizWrong.length}개`;
+  const list = document.getElementById('wn-list'); list.innerHTML = '';
+  quizWrong.forEach(({ parentText, chosen, answer }) => {
+    const item = document.createElement('div'); item.className = 'wn-item';
+    item.innerHTML = `<div class="wn-q"><span>질문</span><span class="wn-chip">${parentText}</span></div><div class="wn-answers"><div class="wn-wrong-ans">${chosen}</div><div class="wn-correct-ans">${answer}</div></div>`;
+    list.appendChild(item);
+  });
+  showQuizScreen('wrongnote');
+}
+
+document.getElementById('btn-quiz').addEventListener('click', startQuiz);
+document.getElementById('btn-retry').addEventListener('click', startQuiz);
+document.getElementById('btn-retry-from-wn').addEventListener('click', startQuiz);
+document.getElementById('btn-retry-from-hist').addEventListener('click', startQuiz);
+document.getElementById('btn-show-wrongnote').addEventListener('click', showWrongNote);
+document.getElementById('btn-show-history').addEventListener('click', showHistory);
+document.getElementById('btn-back-to-result').addEventListener('click',  () => showQuizScreen('result'));
+document.getElementById('btn-back-to-result2').addEventListener('click', () => showQuizScreen('result'));
+document.getElementById('btn-close-quiz').addEventListener('click', () => quizOverlay.classList.remove('active'));
+quizOverlay.addEventListener('click', e => { if (e.target === quizOverlay) quizOverlay.classList.remove('active'); });
+document.getElementById('wn-panel-close').addEventListener('click', () => wnPanel.classList.remove('visible'));
+
+// ── Boot ───────────────────────────────────────────────
+if (!loadFromStorage()) addNode(null, window.innerWidth / 2, window.innerHeight / 2, '중심 주제');
+applyTransform(); render();
+</script>
+</body>
+</html>
