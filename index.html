@@ -78,6 +78,15 @@
     #quiz-card::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
 
     #quiz-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #64748b; }
+    #quiz-timer-wrap { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
+    #quiz-timer-svg { width: 40px; height: 40px; transform: rotate(-90deg); }
+    .timer-bg  { fill: none; stroke: #e2e8f0; stroke-width: 3; }
+    .timer-arc { fill: none; stroke: #4f46e5; stroke-width: 3; stroke-linecap: round;
+                 stroke-dasharray: 100; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear, stroke 0.3s; }
+    .timer-arc.warning { stroke: #f59e0b; }
+    .timer-arc.danger  { stroke: #ef4444; }
+    #quiz-timer-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+                      font-size: 13px; font-weight: 700; color: #1e293b; }
     #quiz-progress-bar { height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
     #quiz-progress-fill { height: 100%; background: #4f46e5; border-radius: 99px; transition: width 0.3s; }
 
@@ -249,6 +258,13 @@
   <div id="quiz-card">
     <div id="quiz-header">
       <span id="quiz-count"></span>
+      <div id="quiz-timer-wrap">
+        <svg id="quiz-timer-svg" viewBox="0 0 36 36">
+          <circle class="timer-bg"  cx="18" cy="18" r="15.9"/>
+          <circle class="timer-arc" cx="18" cy="18" r="15.9" id="quiz-timer-arc"/>
+        </svg>
+        <div id="quiz-timer-num">8</div>
+      </div>
       <span id="quiz-score-live"></span>
     </div>
     <div id="quiz-progress-bar"><div id="quiz-progress-fill"></div></div>
@@ -740,7 +756,28 @@ const wnPanelList   = document.getElementById('wn-panel-list');
 const wnPanelCount  = document.getElementById('wn-panel-count');
 
 let quizQuestions = [], quizIdx = 0, quizCorrect = 0, quizAnswered = false, quizWrong = [];
-let quizScope = new Set(); // IDs of parent nodes selected for quiz
+let quizScope = new Set();
+let quizTimerInterval = null;
+const QUIZ_TIME = 8;
+
+function clearTimer() {
+  if (quizTimerInterval) { clearInterval(quizTimerInterval); quizTimerInterval = null; }
+}
+function startTimer() {
+  clearTimer();
+  let remaining = QUIZ_TIME;
+  const arc = document.getElementById('quiz-timer-arc');
+  const num = document.getElementById('quiz-timer-num');
+  function tick() {
+    arc.style.strokeDashoffset = ((QUIZ_TIME - remaining) / QUIZ_TIME) * 100;
+    num.textContent = remaining;
+    arc.className = 'timer-arc' + (remaining <= 3 ? ' danger' : remaining <= 5 ? ' warning' : '');
+    if (remaining === 0) { clearTimer(); selectAnswer(null); return; }
+    remaining--;
+  }
+  tick();
+  quizTimerInterval = setInterval(tick, 1000);
+}
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
@@ -926,15 +963,18 @@ function showQuestion() {
     btn.addEventListener('click', () => selectAnswer(opt));
     quizOptions.appendChild(btn);
   });
+  startTimer();
 }
 
 function selectAnswer(chosen) {
   if (quizAnswered) return;
   quizAnswered = true;
+  clearTimer();
+  const isTimeout = chosen === null;
   const correct = quizQuestions[quizIdx].answer, isRight = chosen === correct;
   if (isRight) quizCorrect++;
   else {
-    const w = { parentText: quizQuestions[quizIdx].parentText, chosen, answer: correct };
+    const w = { parentText: quizQuestions[quizIdx].parentText, chosen: isTimeout ? '(시간 초과)' : chosen, answer: correct };
     quizWrong.push(w);
     wnPanelCount.textContent = quizWrong.length;
     const item = document.createElement('div');
@@ -948,7 +988,7 @@ function selectAnswer(chosen) {
     if (btn.textContent === correct) btn.classList.add('correct');
     else if (btn.textContent === chosen && !isRight) btn.classList.add('wrong');
   });
-  quizFeedback.textContent = isRight ? '정답입니다! 🎉' : `오답 — 정답: ${correct}`;
+  quizFeedback.textContent = isRight ? '정답입니다! 🎉' : isTimeout ? `시간 초과! ⏰ — 정답: ${correct}` : `오답 — 정답: ${correct}`;
   quizFeedback.className   = isRight ? 'correct' : 'wrong';
   quizNext.style.display   = 'block';
   quizNext.textContent     = quizIdx + 1 < quizQuestions.length ? '다음 →' : '결과 보기';
@@ -957,6 +997,7 @@ function selectAnswer(chosen) {
 quizNext.addEventListener('click', () => { quizIdx++; if (quizIdx < quizQuestions.length) showQuestion(); else showResult(); });
 
 function showResult() {
+  clearTimer();
   const tot = quizQuestions.length, pct = Math.round((quizCorrect / tot) * 100);
   quizFill.style.width = '100%'; quizCount.textContent = `${tot} / ${tot}`; quizScoreLive.textContent = `정답 ${quizCorrect}`;
   document.getElementById('res-num').textContent = quizCorrect;
@@ -1009,8 +1050,8 @@ document.getElementById('btn-show-wrongnote').addEventListener('click', showWron
 document.getElementById('btn-show-history').addEventListener('click', showHistory);
 document.getElementById('btn-back-to-result').addEventListener('click',  () => showQuizScreen('result'));
 document.getElementById('btn-back-to-result2').addEventListener('click', () => showQuizScreen('result'));
-document.getElementById('btn-close-quiz').addEventListener('click', () => quizOverlay.classList.remove('active'));
-quizOverlay.addEventListener('click', e => { if (e.target === quizOverlay) quizOverlay.classList.remove('active'); });
+document.getElementById('btn-close-quiz').addEventListener('click', () => { clearTimer(); quizOverlay.classList.remove('active'); });
+quizOverlay.addEventListener('click', e => { if (e.target === quizOverlay) { clearTimer(); quizOverlay.classList.remove('active'); } });
 document.getElementById('wn-panel-close').addEventListener('click', () => wnPanel.classList.remove('visible'));
 
 // ── Boot ───────────────────────────────────────────────
