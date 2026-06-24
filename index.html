@@ -1422,7 +1422,11 @@ searchNext.addEventListener('click', () => doSearch(1));
 document.getElementById('search-close').addEventListener('click', closeSearch);
 
 // ── Boot ───────────────────────────────────────────────
-if (!loadFromStorage()) addNode(null, (window.innerWidth - 240) / 2 + 240, window.innerHeight / 2, '중심 주제');
+loadFromStorage();
+if (!nodes.find(n => n.parentId === null)) {
+  nodes = []; nextId = 1;
+  addNode(null, (window.innerWidth - 240) / 2 + 240, window.innerHeight / 2, '중심 주제');
+}
 applyTransform(); render();
 </script>
 </body>
