@@ -6,59 +6,143 @@
   <title>마인드맵</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; overflow: hidden; }
+    body { font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; height: 100vh; }
 
-    #toolbar {
-      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
-      background: white; border-radius: 12px; padding: 10px 14px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.12); z-index: 100; user-select: none;
+    /* ── Layout ── */
+    #sidebar {
+      width: 240px; height: 100vh; background: #0f172a; color: #e2e8f0;
+      flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid #1e293b;
     }
-    .tb-sep { width: 1px; background: #e2e8f0; margin: 0 2px; }
-
-    button {
-      padding: 7px 14px; border: none; border-radius: 8px; cursor: pointer;
-      font-size: 12px; font-weight: 500; transition: background 0.15s, opacity 0.15s;
-    }
-    button:disabled { opacity: 0.4; cursor: default; }
-    #btn-add    { background: #4f46e5; color: white; }
-    #btn-add:not(:disabled):hover { background: #4338ca; }
-    #btn-delete { background: #ef4444; color: white; }
-    #btn-delete:not(:disabled):hover { background: #dc2626; }
-    #btn-quiz   { background: #8b5cf6; color: white; }
-    #btn-quiz:hover { background: #7c3aed; }
-    #btn-svg    { background: #10b981; color: white; }
-    #btn-svg:hover { background: #059669; }
-    #btn-png    { background: #f59e0b; color: white; }
-    #btn-png:hover { background: #d97706; }
-    #btn-json-save { background: #06b6d4; color: white; }
-    #btn-json-save:hover { background: #0891b2; }
-    #btn-json-load { background: #64748b; color: white; }
-    #btn-json-load:hover { background: #475569; }
-
-    #zoom-indicator {
-      position: fixed; bottom: 16px; right: 16px;
-      background: rgba(0,0,0,0.5); color: white;
-      padding: 5px 12px; border-radius: 20px; font-size: 12px;
-      pointer-events: none;
-    }
-    #hint {
-      position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.55); color: white;
-      padding: 8px 18px; border-radius: 20px; font-size: 12px;
-      pointer-events: none; white-space: nowrap;
-    }
-
-    svg { display: block; width: 100vw; height: 100vh; cursor: default; }
+    #main-area { flex: 1; position: relative; overflow: hidden; height: 100vh; background: #f0f4f8; }
+    svg { display: block; width: 100%; height: 100%; cursor: default; }
     svg.panning { cursor: grabbing !important; }
     svg.space-ready { cursor: grab; }
 
+    /* ── Sidebar header ── */
+    .sb-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 17px 16px 14px; border-bottom: 1px solid #1e293b; flex-shrink: 0;
+    }
+    .sb-logo { font-size: 20px; line-height: 1; }
+    .sb-title { font-size: 15px; font-weight: 700; color: #f8fafc; letter-spacing: -0.3px; }
+
+    /* ── Search ── */
+    .sb-search-wrap { padding: 12px 12px 10px; flex-shrink: 0; border-bottom: 1px solid #1e293b; }
+    #search-input {
+      width: 100%; border: 1.5px solid #334155; border-radius: 8px;
+      padding: 7px 10px; font-size: 13px; background: #1e293b; color: #f1f5f9;
+      outline: none; font-family: 'Segoe UI', sans-serif;
+    }
+    #search-input::placeholder { color: #475569; }
+    #search-input:focus { border-color: #4f46e5; }
+    .sb-search-nav { display: flex; align-items: center; gap: 4px; margin-top: 7px; }
+    #search-count { font-size: 11px; color: #64748b; flex: 1; }
+    #search-prev, #search-next {
+      padding: 3px 8px; border: 1px solid #334155; border-radius: 5px;
+      background: transparent; color: #94a3b8; font-size: 11px; cursor: pointer;
+      transition: border-color 0.12s, color 0.12s;
+    }
+    #search-prev:hover, #search-next:hover { border-color: #818cf8; color: #a5b4fc; }
+    #search-prev:disabled, #search-next:disabled { opacity: 0.3; cursor: default; }
+    #search-close {
+      padding: 3px 6px; border: none; background: none; cursor: pointer;
+      color: #475569; font-size: 14px; line-height: 1; transition: color 0.12s;
+    }
+    #search-close:hover { color: #f87171; }
+
+    /* ── Node tree ── */
+    .sb-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    .sb-section-title {
+      font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 0.9px;
+      text-transform: uppercase; padding: 12px 16px 6px; flex-shrink: 0;
+    }
+    #sb-tree { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+    #sb-tree::-webkit-scrollbar { width: 3px; }
+    #sb-tree::-webkit-scrollbar-thumb { background: #334155; border-radius: 99px; }
+    .sb-node {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 8px; border-radius: 7px; cursor: pointer;
+      font-size: 13px; color: #94a3b8; transition: background 0.1s, color 0.1s;
+      white-space: nowrap; overflow: hidden;
+    }
+    .sb-node:hover { background: #1e293b; color: #cbd5e1; }
+    .sb-node.sb-selected { background: #312e81; color: #a5b4fc; font-weight: 600; }
+    .sb-node-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .sb-node-text { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+    .sb-node-memo { font-size: 9px; color: #f59e0b; flex-shrink: 0; }
+    .sb-empty { font-size: 12px; color: #334155; padding: 10px 8px; }
+
+    /* ── Action buttons ── */
+    .sb-actions {
+      display: flex; gap: 5px; padding: 10px 12px 8px;
+      border-top: 1px solid #1e293b; flex-shrink: 0;
+    }
+    .sb-actions button {
+      flex: 1; padding: 7px 4px; border-radius: 7px; font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; user-select: none;
+    }
+    button:disabled { opacity: 0.35; cursor: default; }
+    #btn-add    { background: #1e1b4b; color: #a5b4fc; border: 1px solid #312e81; }
+    #btn-add:not(:disabled):hover { background: #312e81; }
+    #btn-delete { background: #1c0a0a; color: #fca5a5; border: 1px solid #450a0a; }
+    #btn-delete:not(:disabled):hover { background: #7f1d1d; }
+    #btn-memo   { background: #021c1c; color: #5eead4; border: 1px solid #042f2e; }
+    #btn-memo:not(:disabled):hover { background: #134e4a; }
+
+    /* ── Stats ── */
+    .sb-stats {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 16px 8px; font-size: 11px; color: #334155; flex-shrink: 0;
+    }
+    .sb-stats-dot { color: #1e293b; }
+
+    /* ── Quiz button ── */
+    .sb-quiz-wrap { padding: 6px 12px 8px; flex-shrink: 0; }
+    #btn-quiz {
+      width: 100%; padding: 10px; border-radius: 9px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: white; font-size: 13px; font-weight: 700; border: none; cursor: pointer;
+      transition: opacity 0.15s; letter-spacing: -0.2px;
+    }
+    #btn-quiz:hover { opacity: 0.85; }
+
+    /* ── Export ── */
+    .sb-export {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+      padding: 8px 12px 10px; border-top: 1px solid #1e293b; flex-shrink: 0;
+    }
+    .sb-export button {
+      padding: 6px 4px; border-radius: 6px; font-size: 11px; font-weight: 500;
+      border: 1px solid #1e293b; background: #1e293b; color: #64748b; cursor: pointer;
+      transition: all 0.12s; user-select: none;
+    }
+    .sb-export button:hover { border-color: #475569; color: #94a3b8; }
+
+    /* ── Sidebar footer hint ── */
+    .sb-hint {
+      padding: 8px 14px 10px; font-size: 10px; color: #1e293b;
+      border-top: 1px solid #1e293b; flex-shrink: 0; line-height: 1.6;
+    }
+
+    /* ── SVG edges/nodes ── */
     .edge { fill: none; stroke-width: 2.5; stroke-linecap: round; opacity: 0.55; }
     .node { cursor: pointer; }
     .node rect { transition: filter 0.1s; }
     .node:hover rect { filter: brightness(0.93); }
     .node.selected rect { stroke-width: 3.5 !important; filter: drop-shadow(0 0 6px rgba(0,0,0,0.22)); }
     .node text { dominant-baseline: middle; text-anchor: middle; pointer-events: none; user-select: none; }
+    .collapse-btn { cursor: pointer; }
+    .collapse-btn circle { transition: fill 0.15s; }
+    .collapse-btn:hover circle { fill: #4338ca; }
+
+    /* ── Zoom indicator ── */
+    #zoom-indicator {
+      position: absolute; bottom: 16px; right: 16px;
+      background: rgba(0,0,0,0.45); color: white;
+      padding: 4px 11px; border-radius: 20px; font-size: 12px;
+      pointer-events: none;
+    }
 
     /* ── Quiz overlay ── */
     #quiz-overlay {
@@ -67,7 +151,6 @@
       z-index: 200; align-items: center; justify-content: center;
     }
     #quiz-overlay.active { display: flex; }
-
     #quiz-card {
       background: white; border-radius: 20px; padding: 32px 36px;
       width: min(540px, 92vw); max-height: 90vh; overflow-y: auto;
@@ -76,7 +159,6 @@
     }
     #quiz-card::-webkit-scrollbar { width: 4px; }
     #quiz-card::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
-
     #quiz-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #64748b; }
     #quiz-timer-wrap { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
     #quiz-timer-svg { width: 40px; height: 40px; transform: rotate(-90deg); }
@@ -89,7 +171,6 @@
                       font-size: 13px; font-weight: 700; color: #1e293b; }
     #quiz-progress-bar { height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
     #quiz-progress-fill { height: 100%; background: #4f46e5; border-radius: 99px; transition: width 0.3s; }
-
     #quiz-question { text-align: center; }
     #quiz-question .label { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
     #quiz-question .parent-chip {
@@ -98,7 +179,6 @@
     }
     #quiz-ancestors { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
     #quiz-question .question-text { font-size: 15px; color: #334155; font-weight: 500; }
-
     #quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .quiz-option {
       padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 12px;
@@ -109,28 +189,22 @@
     .quiz-option.correct { border-color: #10b981; background: #d1fae5; color: #065f46; }
     .quiz-option.wrong   { border-color: #ef4444; background: #fee2e2; color: #7f1d1d; }
     .quiz-option:disabled { cursor: default; }
-
     #quiz-feedback { text-align: center; font-size: 15px; font-weight: 600; min-height: 22px; }
     #quiz-feedback.correct { color: #10b981; }
     #quiz-feedback.wrong   { color: #ef4444; }
-
     #quiz-next {
       align-self: center; padding: 12px 32px; background: #4f46e5; color: white;
       border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; display: none;
     }
     #quiz-next:hover { background: #4338ca; }
 
-    /* ── 범위 선택 ── */
+    /* ── Quiz scope ── */
     #quiz-scope { display: none; flex-direction: column; gap: 14px; }
     #quiz-scope .scope-title { font-size: 17px; font-weight: 700; color: #1e293b; text-align: center; }
     #quiz-scope .scope-sub   { font-size: 12px; color: #94a3b8; text-align: center; margin-top: -8px; }
-    #scope-list {
-      display: flex; flex-direction: column; gap: 8px;
-      max-height: 360px; overflow-y: auto; padding-right: 2px;
-    }
+    #scope-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; padding-right: 2px; }
     #scope-list::-webkit-scrollbar { width: 4px; }
     #scope-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
-    .scope-l1 { display: flex; flex-direction: column; gap: 4px; }
     .scope-l1-row {
       display: flex; align-items: center; gap: 8px;
       padding: 9px 12px; border-radius: 10px; background: #f8fafc;
@@ -140,15 +214,12 @@
     .scope-l1-row.all-checked { border-color: #4f46e5; background: #eef2ff; }
     .scope-l1-label { font-size: 14px; font-weight: 600; color: #1e293b; flex: 1; }
     .scope-l1-count { font-size: 11px; color: #94a3b8; }
-    .scope-l2-list { display: flex; flex-direction: column; gap: 3px; padding-left: 24px; }
-    .scope-l2-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 7px 12px; border-radius: 8px; border: 1.5px solid #f1f5f9;
-      cursor: pointer; user-select: none; background: white;
-    }
-    .scope-l2-row:hover { border-color: #c7d2fe; background: #f5f3ff; }
-    .scope-l2-row.checked { border-color: #818cf8; background: #f5f3ff; }
-    .scope-l2-label { font-size: 13px; color: #334155; flex: 1; }
+    .scope-actions { display: flex; gap: 8px; }
+    .scope-actions button { flex: 1; padding: 8px; font-size: 12px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: white; cursor: pointer; color: #64748b; }
+    .scope-actions button:hover { border-color: #4f46e5; color: #4f46e5; }
+    .btn-scope-start { padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-scope-start:hover { background: #4338ca; }
+    .btn-scope-start:disabled { opacity: 0.4; cursor: default; }
     .scope-cb {
       width: 16px; height: 16px; border-radius: 4px; border: 2px solid #cbd5e1;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -158,13 +229,8 @@
     .scope-cb.checked::after { content: '✓'; color: white; font-size: 10px; line-height: 1; }
     .scope-cb.partial { background: #a5b4fc; border-color: #4f46e5; }
     .scope-cb.partial::after { content: '−'; color: white; font-size: 12px; line-height: 1; }
-    .scope-actions { display: flex; gap: 8px; }
-    .scope-actions button { flex: 1; padding: 8px; font-size: 12px; border-radius: 8px; border: 1.5px solid #e2e8f0; background: white; cursor: pointer; color: #64748b; }
-    .scope-actions button:hover { border-color: #4f46e5; color: #4f46e5; }
-    .btn-scope-start { padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
-    .btn-scope-start:hover { background: #4338ca; }
-    .btn-scope-start:disabled { opacity: 0.4; cursor: default; }
 
+    /* ── Quiz result/wrongnote/history ── */
     #quiz-result { display: none; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
     #quiz-result .score-circle {
       width: 100px; height: 100px; border-radius: 50%; background: #eef2ff; border: 4px solid #4f46e5;
@@ -175,7 +241,6 @@
     #quiz-result .result-msg { font-size: 18px; font-weight: 700; color: #1e293b; }
     #quiz-result .result-sub { font-size: 13px; color: #64748b; }
     #quiz-result-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-
     #quiz-wrongnote { display: none; flex-direction: column; gap: 12px; }
     #quiz-wrongnote .wn-title { font-size: 17px; font-weight: 700; color: #1e293b; text-align: center; }
     #quiz-wrongnote .wn-subtitle { font-size: 12px; color: #94a3b8; text-align: center; margin-top: -6px; }
@@ -191,7 +256,6 @@
     .wn-item .wn-wrong-ans::before  { content: '✗  '; }
     .wn-item .wn-correct-ans::before{ content: '✓  '; }
     .wn-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-
     #quiz-history { display: none; flex-direction: column; gap: 12px; }
     #quiz-history .hist-title { font-size: 17px; font-weight: 700; color: #1e293b; text-align: center; }
     #hist-list { display: flex; flex-direction: column; gap: 8px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
@@ -205,7 +269,6 @@
     .hist-pct.hi  { background: #d1fae5; color: #065f46; }
     .hist-pct.mid { background: #fef3c7; color: #78350f; }
     .hist-pct.lo  { background: #fee2e2; color: #7f1d1d; }
-
     .btn-quiz-action { padding: 10px 20px; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .btn-primary   { background: #4f46e5; color: white; } .btn-primary:hover { background: #4338ca; }
     .btn-secondary { background: #e2e8f0; color: #334155; } .btn-secondary:hover { background: #cbd5e1; }
@@ -213,13 +276,32 @@
     .btn-info      { background: #dbeafe; color: #1e40af; } .btn-info:hover { background: #bfdbfe; }
     .btn-danger    { background: #fee2e2; color: #7f1d1d; } .btn-danger:hover  { background: #fecaca; }
 
-    .collapse-btn { cursor: pointer; }
-    .collapse-btn circle { transition: fill 0.15s; }
-    .collapse-btn:hover circle { fill: #4338ca; }
+    /* ── Memo panel ── */
+    #memo-panel {
+      position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+      width: 230px; background: white; border-radius: 14px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15); z-index: 90;
+      display: none; flex-direction: column; overflow: hidden; max-height: 60vh;
+    }
+    #memo-panel.visible { display: flex; }
+    #memo-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 11px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+    }
+    #memo-panel-header .memo-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+    #memo-panel-node { font-size: 11px; color: #64748b; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+    #memo-panel-close { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 14px; padding: 0; line-height: 1; flex-shrink: 0; }
+    #memo-textarea {
+      flex: 1; border: none; outline: none; resize: none;
+      padding: 12px 14px; font-size: 13px; font-family: 'Segoe UI', sans-serif;
+      color: #334155; line-height: 1.6; min-height: 120px; background: white;
+    }
+    #memo-textarea::placeholder { color: #cbd5e1; }
+    #memo-panel-footer { padding: 6px 14px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; flex-shrink: 0; }
 
     /* ── 오답노트 floating panel ── */
     #wn-panel {
-      display: none; position: fixed; left: 16px; top: 50%; transform: translateY(-50%);
+      display: none; position: fixed; left: 256px; top: 50%; transform: translateY(-50%);
       width: 210px; max-height: 70vh; background: white; border-radius: 14px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.18); z-index: 250;
       flex-direction: column; overflow: hidden;
@@ -246,19 +328,67 @@
 </head>
 <body>
 
-<div id="toolbar">
-  <button id="btn-add" disabled>+ 자식 노드</button>
-  <button id="btn-delete" disabled>삭제</button>
-  <div class="tb-sep"></div>
-  <button id="btn-quiz">퀴즈</button>
-  <div class="tb-sep"></div>
-  <button id="btn-svg">SVG</button>
-  <button id="btn-png">PNG</button>
-  <button id="btn-json-save">JSON 저장</button>
-  <button id="btn-json-load">JSON 열기</button>
-  <input type="file" id="file-input" accept=".json" style="display:none">
+<!-- ── Sidebar ── -->
+<div id="sidebar">
+  <div class="sb-header">
+    <span class="sb-logo">📚</span>
+    <span class="sb-title">마인드맵</span>
+  </div>
+
+  <div class="sb-search-wrap">
+    <input id="search-input" placeholder="노드 검색… (Ctrl+F)" autocomplete="off" />
+    <div class="sb-search-nav">
+      <span id="search-count"></span>
+      <button id="search-prev">↑</button>
+      <button id="search-next">↓</button>
+      <button id="search-close">✕</button>
+    </div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-title">노드 목록</div>
+    <div id="sb-tree"></div>
+  </div>
+
+  <div class="sb-actions">
+    <button id="btn-add" disabled>+ 자식</button>
+    <button id="btn-delete" disabled>삭제</button>
+    <button id="btn-memo" disabled>메모</button>
+  </div>
+
+  <div class="sb-stats">
+    <span id="sb-node-count">노드 0개</span>
+    <span class="sb-stats-dot">·</span>
+    <span id="sb-memo-count">메모 0개</span>
+  </div>
+
+  <div class="sb-quiz-wrap">
+    <button id="btn-quiz">🎯 퀴즈 시작</button>
+  </div>
+
+  <div class="sb-export">
+    <button id="btn-json-save">💾 저장</button>
+    <button id="btn-json-load">📂 열기</button>
+    <button id="btn-svg">SVG</button>
+    <button id="btn-png">PNG</button>
+    <input type="file" id="file-input" accept=".json" style="display:none">
+  </div>
+
+  <div class="sb-hint">더블클릭: 편집 &nbsp;·&nbsp; Space+드래그: 이동<br>Shift+클릭: 다중 선택 &nbsp;·&nbsp; Ctrl+Z: 되돌리기</div>
 </div>
 
+<!-- ── Main canvas ── -->
+<div id="main-area">
+  <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+    <g id="canvas">
+      <g id="edges-layer"></g>
+      <g id="nodes-layer"></g>
+    </g>
+  </svg>
+  <div id="zoom-indicator">100%</div>
+</div>
+
+<!-- ── Quiz overlay ── -->
 <div id="quiz-overlay">
   <div id="quiz-card">
     <div id="quiz-header">
@@ -274,7 +404,6 @@
     </div>
     <div id="quiz-progress-bar"><div id="quiz-progress-fill"></div></div>
 
-    <!-- 범위 선택 화면 -->
     <div id="quiz-scope">
       <div class="scope-title">퀴즈 범위 선택</div>
       <div class="scope-sub">포함할 노드를 선택하세요</div>
@@ -333,7 +462,20 @@
   </div>
 </div>
 
-<!-- 오답노트 floating panel -->
+<!-- ── Memo panel ── -->
+<div id="memo-panel">
+  <div id="memo-panel-header">
+    <div>
+      <div class="memo-title">메모</div>
+      <div id="memo-panel-node"></div>
+    </div>
+    <button id="memo-panel-close">✕</button>
+  </div>
+  <textarea id="memo-textarea" placeholder="이 노드에 대한 메모를 입력하세요…"></textarea>
+  <div id="memo-panel-footer">자동 저장됨</div>
+</div>
+
+<!-- ── 오답노트 floating panel ── -->
 <div id="wn-panel">
   <div id="wn-panel-header">
     <span class="wn-panel-title">오답노트</span>
@@ -343,16 +485,6 @@
   <div id="wn-panel-list"></div>
 </div>
 
-<svg id="svg" xmlns="http://www.w3.org/2000/svg">
-  <g id="canvas">
-    <g id="edges-layer"></g>
-    <g id="nodes-layer"></g>
-  </g>
-</svg>
-
-<div id="hint">드래그: 다중 선택 &nbsp;|&nbsp; Space+드래그: 이동 &nbsp;|&nbsp; Shift+클릭: 추가 선택 &nbsp;|&nbsp; 휠: 줌 &nbsp;|&nbsp; 더블클릭: 편집</div>
-<div id="zoom-indicator">100%</div>
-
 <script>
 const svg        = document.getElementById('svg');
 const canvas     = document.getElementById('canvas');
@@ -360,6 +492,7 @@ const edgesLayer = document.getElementById('edges-layer');
 const nodesLayer = document.getElementById('nodes-layer');
 const btnAdd     = document.getElementById('btn-add');
 const btnDelete  = document.getElementById('btn-delete');
+const btnMemo    = document.getElementById('btn-memo');
 
 // ── Constants ──────────────────────────────────────────
 const NODE_W = 130, NODE_H = 44, CHILD_DIST = 190;
@@ -377,14 +510,22 @@ const COLORS = [
 // ── State ──────────────────────────────────────────────
 let nodes       = [];
 let nextId      = 1;
-let selectedIds = new Set();   // multi-selection
-let dragging    = null;        // { items:[{id,origX,origY}], startPt }
-let selBox      = null;        // { startPt, el } — rubber-band selection
-let panning     = null;        // { startX, startY, origPanX, origPanY }
+let selectedIds = new Set();
+let dragging    = null;
+let dragMoved   = false;
+let selBox      = null;
+let panning     = null;
 let panMoved    = false;
 let spaceDown   = false;
 let panX = 0, panY = 0, scale = 1;
 let editing     = null;
+
+// ── Undo / Redo ────────────────────────────────────────
+const MAX_UNDO = 50;
+let undoStack = [], redoStack = [];
+
+// ── Search ─────────────────────────────────────────────
+let searchQuery = '', searchMatches = [], searchIdx = 0;
 
 // ── Storage ────────────────────────────────────────────
 function saveToStorage() {
@@ -400,6 +541,27 @@ function loadFromStorage() {
     collapsedIds = new Set(d.collapsed ?? []);
     return nodes.length > 0;
   } catch (_) { return false; }
+}
+
+// ── Undo / Redo functions ──────────────────────────────
+function snapshot() {
+  undoStack.push({ nodes: JSON.parse(JSON.stringify(nodes)), nextId, collapsed: [...collapsedIds] });
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push({ nodes: JSON.parse(JSON.stringify(nodes)), nextId, collapsed: [...collapsedIds] });
+  const s = undoStack.pop();
+  nodes = s.nodes; nextId = s.nextId; collapsedIds = new Set(s.collapsed);
+  selectedIds = new Set(); render();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push({ nodes: JSON.parse(JSON.stringify(nodes)), nextId, collapsed: [...collapsedIds] });
+  const s = redoStack.pop();
+  nodes = s.nodes; nextId = s.nextId; collapsedIds = new Set(s.collapsed);
+  selectedIds = new Set(); render();
 }
 
 // ── Helpers ────────────────────────────────────────────
@@ -442,7 +604,7 @@ function getColor(id) {
 
 // ── Node operations ────────────────────────────────────
 function addNode(parentId, x, y, text = '새 주제') {
-  const node = { id: nextId++, parentId, x, y, text };
+  const node = { id: nextId++, parentId, x, y, text, memo: '' };
   nodes.push(node); return node;
 }
 function deleteNode(id) {
@@ -454,7 +616,7 @@ function deleteNode(id) {
 
 // ── Render ─────────────────────────────────────────────
 function render() {
-  renderEdges(); renderNodes(); updateToolbar(); saveToStorage();
+  renderEdges(); renderNodes(); renderSidebar(); updateToolbar(); saveToStorage();
 }
 function renderEdges() {
   edgesLayer.innerHTML = '';
@@ -495,13 +657,32 @@ function renderNodes() {
     text.setAttribute('dominant-baseline', 'middle'); text.setAttribute('text-anchor', 'middle');
     text.textContent = node.text.length > 14 ? node.text.slice(0, 13) + '…' : node.text;
 
-    g.appendChild(rect); g.appendChild(text); nodesLayer.appendChild(g);
+    g.appendChild(rect); g.appendChild(text);
+    if (searchQuery && node.text.toLowerCase().includes(searchQuery)) {
+      const hl = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      hl.setAttribute('x', node.x - NODE_W / 2 - 4); hl.setAttribute('y', node.y - NODE_H / 2 - 4);
+      hl.setAttribute('width', NODE_W + 8); hl.setAttribute('height', NODE_H + 8);
+      hl.setAttribute('rx', 13); hl.setAttribute('fill', 'none');
+      const isCurrent = searchMatches[searchIdx]?.id === node.id;
+      hl.setAttribute('stroke', isCurrent ? '#ef4444' : '#f59e0b');
+      hl.setAttribute('stroke-width', isCurrent ? '3' : '2.5');
+      hl.setAttribute('pointer-events', 'none');
+      g.insertBefore(hl, rect);
+    }
+    if (node.memo) {
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', node.x + NODE_W / 2 - 6); dot.setAttribute('cy', node.y - NODE_H / 2 + 6);
+      dot.setAttribute('r', 4); dot.setAttribute('fill', '#f59e0b');
+      dot.setAttribute('stroke', 'white'); dot.setAttribute('stroke-width', '1.5');
+      dot.setAttribute('pointer-events', 'none');
+      g.appendChild(dot);
+    }
+    nodesLayer.appendChild(g);
 
     g.addEventListener('mousedown', e => onNodeMousedown(e, node.id));
     g.addEventListener('click',    e => onNodeClick(e, node.id));
     g.addEventListener('dblclick', e => { e.stopPropagation(); startEdit(node.id); });
 
-    // 접기/펼치기 버튼 (자식이 있는 노드에만)
     const hasChildren = nodes.some(c => c.parentId === node.id);
     if (hasChildren) {
       const isCollapsed = collapsedIds.has(node.id);
@@ -528,18 +709,74 @@ function renderNodes() {
   });
 }
 
+// ── Sidebar tree ───────────────────────────────────────
+function renderSidebar() {
+  const tree = document.getElementById('sb-tree');
+  const root = nodes.find(n => n.parentId === null);
+  tree.innerHTML = '';
+
+  if (!root) {
+    tree.innerHTML = '<div class="sb-empty">노드가 없습니다.</div>';
+  } else {
+    function renderNode(nodeId, depth) {
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      const div = document.createElement('div');
+      const isRoot = node.parentId === null;
+      div.className = 'sb-node' + (selectedIds.has(nodeId) ? ' sb-selected' : '');
+      div.style.paddingLeft = (depth * 14 + 8) + 'px';
+
+      const color = getColor(nodeId);
+      const dot = document.createElement('div');
+      dot.className = 'sb-node-dot';
+      dot.style.background = isRoot ? '#94a3b8' : color.stroke;
+
+      const span = document.createElement('span');
+      span.className = 'sb-node-text';
+      span.textContent = node.text;
+
+      div.appendChild(dot); div.appendChild(span);
+      if (node.memo) {
+        const badge = document.createElement('span');
+        badge.className = 'sb-node-memo'; badge.textContent = '●';
+        div.appendChild(badge);
+      }
+
+      div.addEventListener('click', () => {
+        selectedIds = new Set([nodeId]);
+        centerOnNode(node);
+        render();
+      });
+      tree.appendChild(div);
+
+      if (!collapsedIds.has(nodeId)) {
+        nodes.filter(n => n.parentId === nodeId).forEach(c => renderNode(c.id, depth + 1));
+      }
+    }
+    renderNode(root.id, 0);
+  }
+
+  const memoCount = nodes.filter(n => n.memo).length;
+  document.getElementById('sb-node-count').textContent = `노드 ${nodes.length}개`;
+  document.getElementById('sb-memo-count').textContent = `메모 ${memoCount}개`;
+}
+
 // ── Selection ──────────────────────────────────────────
 function updateToolbar() {
   const sel = [...selectedIds].map(id => nodes.find(n => n.id === id)).filter(Boolean);
   btnAdd.disabled    = sel.length !== 1;
   btnDelete.disabled = sel.length === 0 || sel.every(n => n.parentId === null);
+  btnMemo.disabled   = sel.length !== 1;
+  if (memoPanel.classList.contains('visible')) {
+    if (sel.length === 1) openMemoPanel(sel[0].id);
+    else closeMemoPanel();
+  }
 }
 
 // ── Node click ─────────────────────────────────────────
 function onNodeClick(e, id) {
   e.stopPropagation();
   if (e.shiftKey) {
-    // toggle in selection
     if (selectedIds.has(id)) selectedIds.delete(id);
     else selectedIds.add(id);
   } else {
@@ -564,6 +801,7 @@ function onNodeMousedown(e, id) {
     }),
     startPt: pt,
   };
+  dragMoved = false;
 }
 
 function moveNodeInPlace(id, x, y) {
@@ -583,12 +821,10 @@ function moveNodeInPlace(id, x, y) {
 svg.addEventListener('mousedown', e => {
   if (e.target !== svg && e.target !== canvas) return;
   if (spaceDown || e.button === 1) {
-    // pan
     panning = { startX: e.clientX, startY: e.clientY, origPanX: panX, origPanY: panY };
     panMoved = false;
     svg.classList.add('panning');
   } else {
-    // rubber-band selection
     const pt = getCanvasPoint(e);
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     el.setAttribute('fill', 'rgba(79,70,229,0.08)');
@@ -615,7 +851,7 @@ svg.addEventListener('wheel', e => {
   applyTransform(); saveToStorage();
 }, { passive: false });
 
-// ── Space key for pan mode ─────────────────────────────
+// ── Space key ─────────────────────────────────────────
 window.addEventListener('keydown', e => {
   if (e.code === 'Space' && !editing && e.target === document.body) {
     e.preventDefault(); spaceDown = true; svg.classList.add('space-ready');
@@ -630,6 +866,7 @@ window.addEventListener('mousemove', e => {
   if (dragging) {
     const pt = getCanvasPoint(e);
     const dx = pt.x - dragging.startPt.x, dy = pt.y - dragging.startPt.y;
+    dragMoved = true;
     dragging.items.forEach(({ id, origX, origY }) => {
       const node = nodes.find(n => n.id === id);
       if (!node) return;
@@ -656,7 +893,7 @@ window.addEventListener('mousemove', e => {
 });
 
 window.addEventListener('mouseup', e => {
-  if (dragging) { render(); dragging = null; return; }
+  if (dragging) { if (dragMoved) snapshot(); render(); dragging = null; dragMoved = false; return; }
   if (panning)  { if (panMoved) saveToStorage(); panning = null; svg.classList.remove('panning'); return; }
   if (selBox) {
     const pt = getCanvasPoint(e);
@@ -682,6 +919,9 @@ function startEdit(id) {
   if (editing !== null) commitEdit();
   editing = id;
   const node = nodes.find(n => n.id === id), color = getColor(id);
+  const nodeGroup = nodesLayer.querySelector(`[data-id="${id}"]`);
+  const svgText = nodeGroup?.querySelector('text');
+  if (svgText) svgText.style.visibility = 'hidden';
   const fo = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
   fo.setAttribute('x', node.x - NODE_W / 2 + 6); fo.setAttribute('y', node.y - NODE_H / 2 + 5);
   fo.setAttribute('width', NODE_W - 12); fo.setAttribute('height', NODE_H - 10); fo.id = 'edit-fo';
@@ -696,14 +936,14 @@ function startEdit(id) {
   input.addEventListener('blur', () => commitEdit());
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
-    if (e.key === 'Escape') { editing = null; fo.remove(); }
+    if (e.key === 'Escape') { editing = null; fo.remove(); if (svgText) svgText.style.visibility = ''; }
     e.stopPropagation();
   });
 }
 function commitEdit() {
   if (editing === null) return;
   const fo = document.getElementById('edit-fo'), node = nodes.find(n => n.id === editing);
-  if (fo && node) { const v = fo.querySelector('input')?.value.trim(); if (v) node.text = v; fo.remove(); }
+  if (fo && node) { const v = fo.querySelector('input')?.value.trim(); if (v && v !== node.text) { snapshot(); node.text = v; } fo.remove(); }
   editing = null; render();
 }
 
@@ -712,6 +952,7 @@ btnAdd.addEventListener('click', () => {
   if (selectedIds.size !== 1) return;
   const [sid] = selectedIds;
   const parent = nodes.find(n => n.id === sid); if (!parent) return;
+  snapshot();
   const children = nodes.filter(n => n.parentId === sid);
   const angle = children.length === 0 ? (Math.PI * 2 * Math.random()) : (children.length * 0.65 + Math.PI / 6);
   const newNode = addNode(sid, parent.x + Math.cos(angle) * CHILD_DIST, parent.y + Math.sin(angle) * CHILD_DIST);
@@ -725,13 +966,18 @@ function deleteSelected() {
     const n = nodes.find(x => x.id === id); return n && n.parentId !== null;
   });
   if (toDelete.length === 0) return;
+  snapshot();
   toDelete.forEach(id => deleteNode(id));
   render();
 }
 
 document.addEventListener('keydown', e => {
   if (editing !== null) return;
-  if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+  if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelected(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); openSearch(); return; }
+  if (e.key === 'Escape') { closeSearch(); }
 });
 
 // ── Export ─────────────────────────────────────────────
@@ -775,7 +1021,7 @@ document.getElementById('file-input').addEventListener('change', e => {
       const d = JSON.parse(ev.target.result);
       nodes = d.nodes ?? []; nextId = d.nextId ?? 1;
       panX = d.panX ?? 0; panY = d.panY ?? 0; scale = d.scale ?? 1;
-      selectedIds = new Set(); applyTransform(); render();
+      selectedIds = new Set(); undoStack = []; redoStack = []; applyTransform(); render();
     } catch (_) { alert('올바른 마인드맵 JSON 파일이 아닙니다.'); }
   };
   reader.readAsText(file); e.target.value = '';
@@ -853,12 +1099,10 @@ function generateQuestions() {
   shuffle(pairs);
   const allLeafTexts = nodes.filter(n => leafIds.has(n.id)).map(n => n.text);
   return pairs.slice(0, 10).map(({ parent, child }) => {
-    // 오답 후보 1순위: 같은 부모의 다른 리프 형제 노드
     const siblingLeafs = shuffle(
       nodes.filter(n => n.parentId === parent.id && leafIds.has(n.id) && n.id !== child.id).map(n => n.text)
     );
     const distractors = siblingLeafs.slice(0, 3);
-    // 부족하면 맵 전체 리프에서 보충
     if (distractors.length < 3) {
       const used = new Set([child.text, ...distractors]);
       const extras = shuffle(allLeafTexts.filter(t => !used.has(t)));
@@ -880,7 +1124,6 @@ function showQuizScreen(name) {
 
 function openScopeScreen() {
   const leafIds = new Set(nodes.filter(n => !nodes.some(c => c.parentId === n.id)).map(n => n.id));
-
   function hasQuestions(nodeId) {
     if (nodes.some(c => c.parentId === nodeId && leafIds.has(c.id))) return true;
     return nodes.filter(c => c.parentId === nodeId).some(c => hasQuestions(c.id));
@@ -892,51 +1135,32 @@ function openScopeScreen() {
     });
     return count;
   }
-
   const root = nodes.find(n => n.parentId === null);
   const l1Nodes = root ? nodes.filter(n => n.parentId === root.id) : [];
   const l1WithQ = l1Nodes.filter(l1 => hasQuestions(l1.id));
-
   if (l1WithQ.length === 0) { alert('퀴즈를 만들려면 부모-자식 관계의 노드가 최소 1쌍 필요합니다.'); return; }
-
-  // quizScope는 선택된 L1 노드 ID를 저장
   quizScope = new Set(l1WithQ.map(l1 => l1.id));
-
   const scopeList = document.getElementById('scope-list');
   scopeList.innerHTML = '';
-
   l1WithQ.forEach(l1 => {
     const row = document.createElement('div');
     row.className = 'scope-l1-row all-checked';
     row.dataset.id = l1.id;
-
-    const cb = document.createElement('div');
-    cb.className = 'scope-cb checked';
-
-    const label = document.createElement('span');
-    label.className = 'scope-l1-label';
-    label.textContent = l1.text;
-
-    const countSpan = document.createElement('span');
-    countSpan.className = 'scope-l1-count';
-    countSpan.textContent = `${countQuestions(l1.id)}문제`;
-
-    row.appendChild(cb);
-    row.appendChild(label);
-    row.appendChild(countSpan);
+    const cb = document.createElement('div'); cb.className = 'scope-cb checked';
+    const label = document.createElement('span'); label.className = 'scope-l1-label'; label.textContent = l1.text;
+    const countSpan = document.createElement('span'); countSpan.className = 'scope-l1-count'; countSpan.textContent = `${countQuestions(l1.id)}문제`;
+    row.appendChild(cb); row.appendChild(label); row.appendChild(countSpan);
     row.addEventListener('click', () => toggleScope(l1.id, cb, row));
-
     scopeList.appendChild(row);
   });
-
   updateScopeStartBtn();
   showQuizScreen('scope');
   quizOverlay.classList.add('active');
 }
 
 function updateGroupHeader(headerRow, cb, childIds) {
-  const allOn  = childIds.every(id => quizScope.has(id));
-  const anyOn  = childIds.some(id => quizScope.has(id));
+  const allOn = childIds.every(id => quizScope.has(id));
+  const anyOn = childIds.some(id => quizScope.has(id));
   cb.className = allOn ? 'scope-cb checked' : anyOn ? 'scope-cb partial' : 'scope-cb';
   headerRow.classList.toggle('all-checked', allOn);
   updateScopeStartBtn();
@@ -944,12 +1168,9 @@ function updateGroupHeader(headerRow, cb, childIds) {
 
 function toggleScope(id, cb, row) {
   if (quizScope.has(id)) {
-    quizScope.delete(id);
-    cb.className = 'scope-cb';
-    row.classList.remove('checked', 'all-checked');
+    quizScope.delete(id); cb.className = 'scope-cb'; row.classList.remove('checked', 'all-checked');
   } else {
-    quizScope.add(id);
-    cb.className = 'scope-cb checked';
+    quizScope.add(id); cb.className = 'scope-cb checked';
     row.classList.add(row.classList.contains('scope-l1-row') ? 'all-checked' : 'checked');
   }
   updateScopeStartBtn();
@@ -965,26 +1186,16 @@ document.getElementById('btn-scope-all').addEventListener('click', () => {
     const cb = row.querySelector('.scope-cb'); cb.className = 'scope-cb checked';
     row.classList.add(row.classList.contains('scope-l1-row') ? 'all-checked' : 'checked');
   });
-  document.querySelectorAll('#scope-list .scope-l1-row:not([data-id])').forEach(row => {
-    row.querySelector('.scope-cb').className = 'scope-cb checked';
-    row.classList.add('all-checked');
-  });
   updateScopeStartBtn();
 });
-
 document.getElementById('btn-scope-none').addEventListener('click', () => {
   document.querySelectorAll('#scope-list [data-id]').forEach(row => {
     quizScope.delete(Number(row.dataset.id));
     const cb = row.querySelector('.scope-cb'); cb.className = 'scope-cb';
     row.classList.remove('checked', 'all-checked');
   });
-  document.querySelectorAll('#scope-list .scope-l1-row:not([data-id])').forEach(row => {
-    row.querySelector('.scope-cb').className = 'scope-cb';
-    row.classList.remove('all-checked');
-  });
   updateScopeStartBtn();
 });
-
 document.getElementById('btn-scope-start').addEventListener('click', () => {
   quizQuestions = generateQuestions();
   if (quizQuestions.length === 0) { alert('선택된 범위에서 출제할 문제가 없습니다.'); return; }
@@ -994,9 +1205,7 @@ document.getElementById('btn-scope-start').addEventListener('click', () => {
   showQuestion();
 });
 
-function startQuiz() {
-  openScopeScreen();
-}
+function startQuiz() { openScopeScreen(); }
 
 function showQuestion() {
   quizAnswered = false;
@@ -1020,8 +1229,7 @@ function showQuestion() {
 
 function selectAnswer(chosen) {
   if (quizAnswered) return;
-  quizAnswered = true;
-  clearTimer();
+  quizAnswered = true; clearTimer();
   const isTimeout = chosen === null;
   const q = quizQuestions[quizIdx];
   const correct = q.answer, isRight = chosen === correct;
@@ -1030,8 +1238,7 @@ function selectAnswer(chosen) {
     const w = { parentText: q.parentText, chosen: isTimeout ? '(시간 초과)' : chosen, answer: correct, options: q.options, ancestorPath: q.ancestorPath };
     quizWrong.push(w);
     wnPanelCount.textContent = quizWrong.length;
-    const item = document.createElement('div');
-    item.className = 'wn-panel-item';
+    const item = document.createElement('div'); item.className = 'wn-panel-item';
     item.innerHTML = `<div class="wn-pi-q">질문 <span class="wn-pi-chip">${w.parentText}</span></div><div class="wn-pi-wrong">${w.chosen}</div><div class="wn-pi-correct">${w.answer}</div>`;
     wnPanelList.appendChild(item);
     wnPanel.classList.add('visible');
@@ -1071,8 +1278,7 @@ function startRetryWrong() {
   }));
   quizIdx = 0; quizCorrect = 0; quizWrong = [];
   wnPanelList.innerHTML = ''; wnPanelCount.textContent = '0'; wnPanel.classList.remove('visible');
-  showQuizScreen('question');
-  showQuestion();
+  showQuizScreen('question'); showQuestion();
 }
 
 function saveQuizResult(correct, total, pct) {
@@ -1121,8 +1327,102 @@ document.getElementById('btn-close-quiz').addEventListener('click', () => { clea
 quizOverlay.addEventListener('click', e => { if (e.target === quizOverlay) { clearTimer(); quizOverlay.classList.remove('active'); } });
 document.getElementById('wn-panel-close').addEventListener('click', () => wnPanel.classList.remove('visible'));
 
+// ── Memo panel ─────────────────────────────────────────
+const memoPanel    = document.getElementById('memo-panel');
+const memoTextarea = document.getElementById('memo-textarea');
+const memoPanelNode = document.getElementById('memo-panel-node');
+let memoNodeId = null;
+
+function openMemoPanel(id) {
+  if (memoNodeId !== null && memoNodeId !== id) {
+    const prev = nodes.find(n => n.id === memoNodeId);
+    if (prev) { prev.memo = memoTextarea.value; saveToStorage(); }
+  }
+  const node = nodes.find(n => n.id === id);
+  if (!node) return;
+  memoNodeId = id;
+  memoPanelNode.textContent = node.text;
+  memoTextarea.value = node.memo ?? '';
+  memoPanel.classList.add('visible');
+}
+function closeMemoPanel() {
+  if (memoNodeId !== null) {
+    const node = nodes.find(n => n.id === memoNodeId);
+    if (node) { node.memo = memoTextarea.value; saveToStorage(); }
+  }
+  memoPanel.classList.remove('visible');
+  memoNodeId = null;
+}
+
+btnMemo.addEventListener('click', () => {
+  if (selectedIds.size !== 1) return;
+  const [id] = selectedIds;
+  if (memoPanel.classList.contains('visible') && memoNodeId === id) closeMemoPanel();
+  else openMemoPanel(id);
+});
+document.getElementById('memo-panel-close').addEventListener('click', closeMemoPanel);
+memoTextarea.addEventListener('input', () => {
+  if (memoNodeId === null) return;
+  const node = nodes.find(n => n.id === memoNodeId);
+  if (!node) return;
+  const hadMemo = !!node.memo;
+  node.memo = memoTextarea.value;
+  saveToStorage();
+  if (hadMemo !== !!node.memo) { renderEdges(); renderNodes(); renderSidebar(); }
+});
+
+// ── Search ─────────────────────────────────────────────
+const searchInput = document.getElementById('search-input');
+const searchCount = document.getElementById('search-count');
+const searchPrev  = document.getElementById('search-prev');
+const searchNext  = document.getElementById('search-next');
+
+function openSearch() {
+  searchInput.focus(); searchInput.select();
+}
+function closeSearch() {
+  searchQuery = ''; searchMatches = []; searchIdx = 0;
+  searchInput.value = '';
+  render();
+}
+function centerOnNode(node) {
+  panX = svg.clientWidth / 2 - node.x * scale;
+  panY = svg.clientHeight / 2 - node.y * scale;
+  applyTransform(); saveToStorage();
+}
+function updateSearchCount() {
+  if (!searchQuery) { searchCount.textContent = ''; return; }
+  searchCount.textContent = searchMatches.length ? `${searchIdx + 1} / ${searchMatches.length}` : '없음';
+  searchPrev.disabled = searchMatches.length <= 1;
+  searchNext.disabled = searchMatches.length <= 1;
+}
+function doSearch(dir) {
+  if (!searchMatches.length) return;
+  searchIdx = (searchIdx + dir + searchMatches.length) % searchMatches.length;
+  render();
+  updateSearchCount();
+  centerOnNode(searchMatches[searchIdx]);
+}
+
+searchInput.addEventListener('input', () => {
+  searchQuery = searchInput.value.trim().toLowerCase();
+  searchMatches = searchQuery ? nodes.filter(n => n.text.toLowerCase().includes(searchQuery)) : [];
+  searchIdx = 0;
+  render();
+  updateSearchCount();
+  if (searchMatches.length) centerOnNode(searchMatches[0]);
+});
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter')  { e.preventDefault(); doSearch(e.shiftKey ? -1 : 1); }
+  if (e.key === 'Escape') { e.stopPropagation(); closeSearch(); }
+  e.stopPropagation();
+});
+searchPrev.addEventListener('click', () => doSearch(-1));
+searchNext.addEventListener('click', () => doSearch(1));
+document.getElementById('search-close').addEventListener('click', closeSearch);
+
 // ── Boot ───────────────────────────────────────────────
-if (!loadFromStorage()) addNode(null, window.innerWidth / 2, window.innerHeight / 2, '중심 주제');
+if (!loadFromStorage()) addNode(null, (window.innerWidth - 240) / 2 + 240, window.innerHeight / 2, '중심 주제');
 applyTransform(); render();
 </script>
 </body>
